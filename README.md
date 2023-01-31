@@ -1,2 +1,2 @@
 # DataVisualizer
-Data vvisualizer for Advanced Programming course project
+Data visualizer for Advanced Programming course project
