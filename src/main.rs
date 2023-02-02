@@ -1,31 +1,51 @@
-use std::sync::RwLock;
+use rocket::fs::{FileServer, relative};
+use rocket::response::stream::{Event, EventStream};
+use rocket::serde::{json::Json, Deserialize, Serialize};
+use rocket::tokio::select;
+use rocket::tokio::sync::broadcast::{channel, error::RecvError, Sender};
+use rocket::{Shutdown, State};
 
-use rocket::{serde::{Deserialize, json::Json}, State};
+#[macro_use]
+extern crate rocket;
 
-#[macro_use] extern crate rocket;
+#[derive(Serialize, Clone, Deserialize, Debug)]
+#[serde(crate = "rocket::serde")]
+struct Values(String);
 
-struct Values(RwLock<String>);
+#[get("/index")]
+async fn index(queue: &State<Sender<Values>>, mut end: Shutdown) -> EventStream![] {
+    let mut rx = queue.subscribe();
+    EventStream! {
+        loop {
+            let msg = select! {
+                msg = rx.recv() => match msg {
+                    Ok(msg) => msg,
+                    Err(RecvError::Closed) => break,
+                    Err(RecvError::Lagged(_)) => continue,
+                },
+                _ = &mut end => break,
+            };
 
-#[get("/")]
-fn index(values: &State<Values>) -> String {
-    let a = values.0.read().unwrap().to_owned();
-    a.to_owned()
+            yield Event::json(&msg);
+        }
+    }
 }
 
 #[derive(Deserialize)]
-#[serde(crate = "rocket::serde")]
 struct Test {
     stringa: String,
 }
 
 #[post("/", format = "application/json", data = "<stringa>")]
-fn prova(stringa: Json<Test>,values: &State<Values>) {
+fn prova(stringa: Json<Test>, queue: &State<Sender<Values>>) {
     println!("{:?}", stringa.stringa);
-    *values.0.write().unwrap() = stringa.stringa.to_owned();
+    let _res = queue.send(Values(stringa.stringa.to_owned()));
 }
 
 #[launch]
 fn rocket() -> _ {
-    let global_state:Values = Values(RwLock::new("Ciaone".to_string()));
-    rocket::build().manage(global_state).mount("/", routes![index, prova])
+    rocket::build()
+        .manage(channel::<Values>(16536).0)
+        .mount("/", routes![index, prova])
+        .mount("/", FileServer::from(relative!("frontEnd/build")))
 }
