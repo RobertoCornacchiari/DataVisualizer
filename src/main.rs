@@ -1,19 +1,38 @@
+mod interfaces;
+
+use interfaces::MARKETS;
 use rocket::fs::{FileServer, relative};
-use rocket::response::stream::{Event, EventStream};
+use rocket::http::Status;
+use rocket::response::stream::{Event as RocketEvent, EventStream};
 use rocket::serde::{json::Json, Deserialize, Serialize};
 use rocket::tokio::select;
 use rocket::tokio::sync::broadcast::{channel, error::RecvError, Sender};
 use rocket::{Shutdown, State};
+use unitn_market_2022::market::good_label::GoodLabel;
+
+use crate::interfaces::LogEvent;
 
 #[macro_use]
 extern crate rocket;
 
-#[derive(Serialize, Clone, Deserialize, Debug)]
-#[serde(crate = "rocket::serde")]
-struct Values(String);
 
-#[get("/index")]
-async fn index(queue: &State<Sender<Values>>, mut end: Shutdown) -> EventStream![] {
+#[post("/currentGoods/<market>", data = "<goods>")]
+fn post_current_goods(goods: Json<Vec<GoodLabel>>, market: &str) -> Status{
+    if !MARKETS.contains(&market) {
+        return Status::NotFound;
+    }
+    Status::Accepted
+}
+
+//All events performed by the trader are sent to this function
+#[post("/log", data="<event>")]
+fn post_new_event(event: Json<LogEvent>,queue: &State<Sender<LogEvent>>) {
+    println!("{:?}", event);
+    let _res = queue.send(event.into_inner());
+}
+
+#[get("/log")]
+fn get_log(queue: &State<Sender<LogEvent>>, mut end: Shutdown) -> EventStream![] {
     let mut rx = queue.subscribe();
     EventStream! {
         loop {
@@ -26,26 +45,15 @@ async fn index(queue: &State<Sender<Values>>, mut end: Shutdown) -> EventStream!
                 _ = &mut end => break,
             };
 
-            yield Event::json(&msg);
+            yield RocketEvent::json(&msg);
         }
     }
-}
-
-#[derive(Deserialize)]
-struct Test {
-    stringa: String,
-}
-
-#[post("/", format = "application/json", data = "<stringa>")]
-fn prova(stringa: Json<Test>, queue: &State<Sender<Values>>) {
-    println!("{:?}", stringa.stringa);
-    let _res = queue.send(Values(stringa.stringa.to_owned()));
 }
 
 #[launch]
 fn rocket() -> _ {
     rocket::build()
-        .manage(channel::<Values>(16536).0)
-        .mount("/", routes![index, prova])
+        .manage(channel::<LogEvent>(16536).0)
+        .mount("/", routes![post_current_goods, post_new_event, get_log])
         .mount("/", FileServer::from(relative!("frontEnd/build")))
 }
