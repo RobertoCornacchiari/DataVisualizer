@@ -8,6 +8,10 @@ const columns: IColumn[]  = [
     Header: "Events",
     columns: [
       {
+        Header: "Day",
+        accessor: "time",
+      },
+      {
         Header: "Event kind",
         accessor: "event.kind",
       },
@@ -42,7 +46,7 @@ function App() {
     a.addEventListener("message", (ev) => {
       const msg = JSON.parse(ev.data);
       console.log(msg);
-      setData((prev) => [...prev, msg]);
+      setData((prev) => [ msg, ...prev]);
     });
   }, []);
 

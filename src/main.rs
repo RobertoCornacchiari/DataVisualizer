@@ -1,5 +1,7 @@
 mod interfaces;
 
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use interfaces::MARKETS;
 use rocket::fs::{FileServer, relative};
 use rocket::http::Status;
@@ -15,6 +17,8 @@ use crate::interfaces::LogEvent;
 #[macro_use]
 extern crate rocket;
 
+//Struct used to count the days passed during the simulation
+struct Time(AtomicU32);
 
 #[post("/currentGoods/<market>", data = "<goods>")]
 fn post_current_goods(goods: Json<Vec<GoodLabel>>, market: &str) -> Status{
@@ -26,8 +30,13 @@ fn post_current_goods(goods: Json<Vec<GoodLabel>>, market: &str) -> Status{
 
 //All events performed by the trader are sent to this function
 #[post("/log", data="<event>")]
-fn post_new_event(event: Json<LogEvent>,queue: &State<Sender<LogEvent>>) {
+fn post_new_event(mut event: Json<LogEvent>,queue: &State<Sender<LogEvent>>, time: &State<Time>) {
     println!("{:?}", event);
+    if event.result {
+        event.time = time.0.fetch_add(1, Ordering::Relaxed) + 1;
+    } else {
+        event.time = time.0.load(Ordering::Relaxed);
+    }
     let _res = queue.send(event.into_inner());
 }
 
@@ -53,6 +62,7 @@ fn get_log(queue: &State<Sender<LogEvent>>, mut end: Shutdown) -> EventStream![]
 #[launch]
 fn rocket() -> _ {
     rocket::build()
+        .manage(Time(AtomicU32::new(0)))
         .manage(channel::<LogEvent>(16536).0)
         .mount("/", routes![post_current_goods, post_new_event, get_log])
         .mount("/", FileServer::from(relative!("frontEnd/build")))

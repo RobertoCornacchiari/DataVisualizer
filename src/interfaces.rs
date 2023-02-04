@@ -16,6 +16,8 @@ pub struct CustomEvent {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LogEvent {
+    #[serde(default)]
+    pub time: u32,
     pub event: CustomEvent,
     pub market: String,
     pub result: bool,
