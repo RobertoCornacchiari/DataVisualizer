@@ -6,7 +6,7 @@ use interfaces::MARKETS;
 use rocket::fs::{FileServer, relative};
 use rocket::http::Status;
 use rocket::response::stream::{Event as RocketEvent, EventStream};
-use rocket::serde::{json::Json, Deserialize, Serialize};
+use rocket::serde::json::Json;
 use rocket::tokio::select;
 use rocket::tokio::sync::broadcast::{channel, error::RecvError, Sender};
 use rocket::{Shutdown, State};
@@ -31,15 +31,17 @@ fn post_current_goods(goods: Json<Vec<GoodLabel>>, market: &str) -> Status{
 //All events performed by the trader are sent to this function
 #[post("/log", data="<event>")]
 fn post_new_event(mut event: Json<LogEvent>,queue: &State<Sender<LogEvent>>, time: &State<Time>) {
-    println!("{:?}", event);
+    //Check if the action had a positive result (no error). If so, increment the day
     if event.result {
         event.time = time.0.fetch_add(1, Ordering::Relaxed) + 1;
     } else {
         event.time = time.0.load(Ordering::Relaxed);
     }
+    //Send the event to the receivers
     let _res = queue.send(event.into_inner());
 }
 
+//Function that provides the event received from the trader
 #[get("/log")]
 fn get_log(queue: &State<Sender<LogEvent>>, mut end: Shutdown) -> EventStream![] {
     let mut rx = queue.subscribe();

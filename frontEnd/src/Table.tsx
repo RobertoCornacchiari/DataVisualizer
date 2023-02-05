@@ -1,22 +1,20 @@
 import { useTable } from "react-table";
+import { IColumn, ILogEvent } from "./interfaces";
 
-export interface IColumn {
-  Header: string;
-  columns: {
-    Header: string;
-    accessor: string;
-  }[];
+interface ITable {
+  columns: IColumn[],
+  data: ILogEvent[]
 }
 
-const Table = ({ columns, data }: { columns: IColumn[]; data: any[] }) => {
-  // Use the state and functions returned from useTable to build your UI
+const Table = ({ columns, data }: ITable) => {
+  // Use the state and functions returned from useTable to build the UI
   const { getTableProps, getTableBodyProps, headerGroups, rows, prepareRow } =
     useTable({
       columns,
       data,
     });
   console.log(rows);
-  // Render the UI for your table
+  // Render the UI
   return (
     <table {...getTableProps()}>
       <thead>

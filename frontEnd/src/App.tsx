@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import logo from "./logo.svg";
 import "./App.css";
-import Table, { IColumn } from "./Table";
+import { IColumn, ILogEvent } from "./interfaces";
+import Table from "./Table";
 
-const columns: IColumn[]  = [
+const columns: IColumn[] = [
   {
     Header: "Events",
     columns: [
@@ -21,40 +21,40 @@ const columns: IColumn[]  = [
       },
       {
         Header: "Market",
-        accessor: "market"
+        accessor: "market",
       },
       {
         Header: "Quantity",
-        accessor: "event.quantity"
+        accessor: "event.quantity",
       },
       {
         Header: "Price",
-        accessor: "event.price"
+        accessor: "event.price",
       },
       {
         Header: "Error",
-        accessor: "error"
-      }
-    ]
-  }
-]
+        accessor: "error",
+      },
+    ],
+  },
+];
 
-function App() {
-  const [data, setData] = useState<any[]>([]);
+const App = () => {
+  const [data, setData] = useState<ILogEvent[]>([]);
   useEffect(() => {
     let a = new EventSource("/log");
     a.addEventListener("message", (ev) => {
       const msg = JSON.parse(ev.data);
       console.log(msg);
-      setData((prev) => [ msg, ...prev]);
+      setData((prev) => [msg, ...prev]);
     });
   }, []);
 
   return (
     <div className="App">
-      <Table columns={columns} data={data}/>
+      <Table columns={columns} data={data} />
     </div>
   );
-}
+};
 
 export default App;
