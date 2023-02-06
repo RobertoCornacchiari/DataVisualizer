@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import "./App.css";
+import "./index.css";
 import { IColumn, ILogEvent } from "./interfaces";
 import Table from "./Table";
 
