@@ -3,7 +3,7 @@ mod interfaces;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::RwLock;
 
-use interfaces::MARKETS;
+use interfaces::{CustomEvent, MARKETS};
 use rocket::fs::{relative, FileServer};
 use rocket::http::Status;
 use rocket::response::stream::{Event as RocketEvent, EventStream};
@@ -11,6 +11,8 @@ use rocket::serde::json::Json;
 use rocket::tokio::select;
 use rocket::tokio::sync::broadcast::{channel, error::RecvError, Sender};
 use rocket::{Shutdown, State};
+use unitn_market_2022::event::event::Event;
+use unitn_market_2022::event::event::EventKind::{Bought, LockedBuy, LockedSell, Sold, Wait};
 use unitn_market_2022::market::good_label::GoodLabel;
 
 use crate::interfaces::LogEvent;
@@ -30,6 +32,42 @@ fn post_current_goods(goods: Json<Vec<GoodLabel>>, market: &str) -> Status {
         return Status::NotFound;
     }
     Status::Accepted
+}
+
+//Function to craft a LogEvent from an action performed by the trader
+fn craft_log_event(event: &Event, market: String, result: bool, error: Option<String>) -> LogEvent {
+    let custom_ev = CustomEvent {
+        kind: match event.kind {
+            Bought => interfaces::CustomEventKind::Bought,
+            Sold => interfaces::CustomEventKind::Sold,
+            LockedBuy => interfaces::CustomEventKind::LockedBuy,
+            LockedSell => interfaces::CustomEventKind::LockedSell,
+            Wait => interfaces::CustomEventKind::Wait,
+        },
+        good_kind: event.good_kind,
+        quantity: event.quantity,
+        price: event.price,
+    };
+    LogEvent {
+        market,
+        result,
+        error,
+        time: 0,
+        event: custom_ev,
+    }
+}
+
+//Function to simulate a client that sends a new LogEvent
+#[get("/provaInvio")]
+async fn prova_invio() {
+    let event = Event {
+        kind: Bought,
+        good_kind: unitn_market_2022::good::good_kind::GoodKind::EUR,
+        quantity: 10.0,
+        price: 150.10,
+    };
+    let client = reqwest::Client::new();
+    let _res = client.post("http://localhost:8000/log").json(&craft_log_event(&event, "BFB".to_string(), true, None)).send().await;
 }
 
 //All events performed by the trader are sent to this function
@@ -55,7 +93,7 @@ async fn post_new_event(
 
 //Function that provides the event received from the trader
 #[get("/log")]
-async fn get_log<'a>(
+fn get_log<'a>(
     queue: &State<Sender<LogEvent>>,
     mut end: Shutdown,
     cache: &State<Cache>,
@@ -82,7 +120,7 @@ async fn get_log<'a>(
                 },
                 _ = &mut end => break,
             }};
-            
+
             yield RocketEvent::json(&msg);
         }
     }
@@ -94,6 +132,9 @@ fn rocket() -> _ {
         .manage(Time(AtomicU32::new(0)))
         .manage(channel::<LogEvent>(16536).0)
         .manage(Cache(RwLock::new(Vec::new())))
-        .mount("/", routes![post_current_goods, post_new_event, get_log])
+        .mount(
+            "/",
+            routes![post_current_goods, post_new_event, get_log, prova_invio],
+        )
         .mount("/", FileServer::from(relative!("frontEnd/build")))
 }
