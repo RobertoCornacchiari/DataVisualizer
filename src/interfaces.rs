@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use unitn_market_2022::good::good_kind::GoodKind;
+use unitn_market_2022::good::good_kind::{GoodKind, self};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum CustomEventKind {
@@ -25,4 +25,23 @@ pub struct LogEvent {
     pub error: Option<String>
 }
 
-pub const MARKETS:[&str; 3] =["BFB","RCNZ","ZSE"];
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CurrentGood {
+    pub time: u32,
+    pub value: f32,
+    pub kind: GoodKind
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CurrentBuyRate {
+    pub time: u32,
+    pub value: f32,
+    pub kind: GoodKind
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CurrentSellRate {
+    pub time: u32,
+    pub value: f32,
+    pub kind: GoodKind
+}

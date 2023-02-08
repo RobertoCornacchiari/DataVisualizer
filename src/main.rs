@@ -3,16 +3,19 @@ mod interfaces;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::RwLock;
 
-use interfaces::{CustomEvent, MARKETS};
+use interfaces::{CurrentBuyRate, CurrentGood, CurrentSellRate, CustomEvent};
+use rand::{rngs::OsRng, Rng};
 use rocket::fs::{relative, FileServer};
-use rocket::http::Status;
 use rocket::response::stream::{Event as RocketEvent, EventStream};
 use rocket::serde::json::Json;
 use rocket::tokio::select;
 use rocket::tokio::sync::broadcast::{channel, error::RecvError, Sender};
 use rocket::{Shutdown, State};
+use serde::Serialize;
+use tokio::sync::broadcast::Receiver;
 use unitn_market_2022::event::event::Event;
 use unitn_market_2022::event::event::EventKind::{Bought, LockedBuy, LockedSell, Sold, Wait};
+use unitn_market_2022::good::good_kind::GoodKind;
 use unitn_market_2022::market::good_label::GoodLabel;
 
 use crate::interfaces::LogEvent;
@@ -23,16 +26,179 @@ extern crate rocket;
 //Struct used to count the days passed during the simulation
 struct Time(AtomicU32);
 
-//Struct used to store in memory the logs, in ordet to provied them to clients that connect after the simulation started
+//Struct used to store in memory the logs, in order to provied them to clients that connect after the simulation started
 struct Cache(RwLock<Vec<LogEvent>>);
 
-#[post("/currentGoods/<market>", data = "<goods>")]
-fn post_current_goods(goods: Json<Vec<GoodLabel>>, market: &str) -> Status {
-    if !MARKETS.contains(&market) {
-        return Status::NotFound;
-    }
-    Status::Accepted
+//Function used to receive from the trader the current GoodLabels held by the market referenced
+#[post("/currentGoodLabels/<market>", data = "<goods>")]
+fn post_current_good_labels(
+    goods: Json<Vec<GoodLabel>>,
+    market: &str,
+    current_goods: &State<[(Sender<CurrentGood>, Receiver<CurrentGood>); 3]>,
+    current_buy_rate: &State<[(Sender<CurrentBuyRate>, Receiver<CurrentBuyRate>); 3]>,
+    current_sell_rate: &State<[(Sender<CurrentSellRate>, Receiver<CurrentSellRate>); 3]>,
+    time: &State<Time>,
+) {
+    let index = match market {
+        "BFB" => 0,
+        "RCNZ" => 1,
+        "ZSE" => 2,
+        _ => return,
+    };
+    //I add all the goodLabels to the channels
+    goods.iter().for_each(|good_label| {
+        let time = time.0.load(Ordering::Relaxed);
+        let kind = good_label.good_kind;
+
+        let c_goods = CurrentGood {
+            value: good_label.quantity,
+            kind,
+            time,
+        };
+        let _res = current_goods[index].0.send(c_goods);
+
+        let c_buy_rate = CurrentBuyRate {
+            value: good_label.exchange_rate_buy,
+            kind,
+            time,
+        };
+        let _res = current_buy_rate[index].0.send(c_buy_rate);
+
+        let c_sell_rate = CurrentSellRate {
+            value: good_label.exchange_rate_sell,
+            kind,
+            time,
+        };
+        let _res = current_sell_rate[index].0.send(c_sell_rate);
+    });
 }
+
+//Function that provides the eventStream for all the kind of information regarding the market (currentGoods, exchangeBuyRate, exchangeSellRate)
+fn send_event_stream<T: Clone + Serialize>(
+    mut rx: Receiver<T>,
+    index: usize,
+    mut end: Shutdown,
+) -> EventStream![] {
+    EventStream! {
+        loop {
+            if index == 3 {
+                break;
+            }
+            let msg =
+                select! {
+                msg = rx.recv() => match msg {
+                    Ok(msg) => msg,
+                    Err(RecvError::Closed) => break,
+                    Err(RecvError::Lagged(_)) => continue,
+                },
+                _ = &mut end => break,
+            };
+            yield RocketEvent::json(&msg);
+        }
+    }
+}
+
+//Function used to send to the client the current goods held by the market referenced
+#[get("/currentGoods/<market>")]
+fn get_current_goods(
+    market: &str,
+    rec: &State<[(Sender<CurrentGood>, Receiver<CurrentGood>); 3]>,
+    end: Shutdown,
+) -> EventStream![] {
+    let index = match market {
+        "BFB" => 0,
+        "RCNZ" => 1,
+        "ZSE" => 2,
+        _ => 3,
+    };
+    //If the index is 3 the market sent is not valid
+    send_event_stream(rec[index % 3].0.subscribe(), index, end)
+}
+
+//Function used to send to the client the current exchange buy rates of the market referenced
+#[get("/currentBuyRate/<market>")]
+fn get_current_buy_rate(
+    market: &str,
+    rec: &State<[(Sender<CurrentBuyRate>, Receiver<CurrentBuyRate>); 3]>,
+    end: Shutdown,
+) -> EventStream![] {
+    let index = match market {
+        "BFB" => 0,
+        "RCNZ" => 1,
+        "ZSE" => 2,
+        _ => 3,
+    };
+    //If the index is 3 the market sent is not valid
+    send_event_stream(rec[index % 3].0.subscribe(), index, end)
+}
+
+//Function used to send to the client the current exchange sell rates of the market referenced
+#[get("/currentSellRate/<market>")]
+fn get_current_sell_rate(
+    market: &str,
+    rec: &State<[(Sender<CurrentSellRate>, Receiver<CurrentSellRate>); 3]>,
+    end: Shutdown,
+) -> EventStream![] {
+    let index = match market {
+        "BFB" => 0,
+        "RCNZ" => 1,
+        "ZSE" => 2,
+        _ => 3,
+    };
+    //If the index is 3 the market sent is not valid
+    send_event_stream(rec[index % 3].0.subscribe(), index, end)
+}
+
+// #[post("/stringa/<market>", data = "<stringa>")]
+// fn post_str(
+//     market: &str,
+//     stringa: Json<String>,
+//     rec: &State<[(Sender<String>, Receiver<String>); 3]>,
+// ) {
+//     let index = match market {
+//         "BFB" => 0,
+//         "RCNZ" => 1,
+//         "ZSE" => 2,
+//         _ => return,
+//     };
+//     let _res = rec[index].0.send(stringa.into_inner());
+// }
+
+// #[get("/stringa/<market>")]
+// fn get_str(
+//     market: &str,
+//     rec: &State<[(Sender<String>, Receiver<String>); 3]>,
+//     mut end: Shutdown,
+// ) -> EventStream![] {
+//     let index = match market {
+//         "BFB" => 0,
+//         "RCNZ" => 1,
+//         "ZSE" => 2,
+//         _ => 3,
+//     };
+//     //If the index is 3 the market sent is not valid
+//     let mut rx = match index {
+//         3 => rec[0].0.subscribe(),
+//         _ => rec[index].0.subscribe(),
+//     };
+//     EventStream! {
+//         loop {
+//             if index == 3 {
+//                 break;
+//             }
+//             let msg =
+//                 select! {
+//                 msg = rx.recv() => match msg {
+//                     Ok(msg) => {println!("{}", &msg);msg},
+//                     Err(RecvError::Closed) => break,
+//                     Err(RecvError::Lagged(_)) => continue,
+//                 },
+//                 _ = &mut end => break,
+//             };
+//             yield RocketEvent::json(&msg);
+//         }
+//     }
+// }
 
 //Function to craft a LogEvent from an action performed by the trader
 fn craft_log_event(event: &Event, market: String, result: bool, error: Option<String>) -> LogEvent {
@@ -67,7 +233,36 @@ async fn prova_invio() {
         price: 150.10,
     };
     let client = reqwest::Client::new();
-    let _res = client.post("http://localhost:8000/log").json(&craft_log_event(&event, "BFB".to_string(), true, None)).send().await;
+    let _res = client
+        .post("http://localhost:8000/log")
+        .json(&craft_log_event(&event, "BFB".to_string(), true, None))
+        .send()
+        .await;
+}
+
+//Function to simulate a client that sends a new Vec of GoodLabels
+#[get("/fakeGoodLabels/<market>")]
+async fn fake_good_labels(market: &str, time: &State<Time>) {
+    let mut rng = OsRng::default();
+    let kinds = [GoodKind::EUR, GoodKind::YUAN, GoodKind::YEN, GoodKind::USD];
+    let labels: Vec<GoodLabel> = kinds
+        .map(|kind| {
+            return GoodLabel {
+                good_kind: kind,
+                quantity: rng.gen_range(1.0..1000.0),
+                exchange_rate_buy: rng.gen_range(0.1..10.22),
+                exchange_rate_sell: rng.gen_range(0.1..10.0),
+            };
+        })
+        .to_vec();
+    let client = reqwest::Client::new();
+    let _res = client
+        .post("http://localhost:8000/currentGoodLabels/".to_string() + market)
+        .json(&labels)
+        .send()
+        .await;
+
+    time.0.fetch_add(1, Ordering::Relaxed);
 }
 
 //All events performed by the trader are sent to this function
@@ -132,9 +327,37 @@ fn rocket() -> _ {
         .manage(Time(AtomicU32::new(0)))
         .manage(channel::<LogEvent>(16536).0)
         .manage(Cache(RwLock::new(Vec::new())))
+        .manage([
+            channel::<CurrentGood>(4096),
+            channel::<CurrentGood>(4096),
+            channel::<CurrentGood>(4096),
+        ])
+        .manage([
+            channel::<CurrentBuyRate>(4096),
+            channel::<CurrentBuyRate>(4096),
+            channel::<CurrentBuyRate>(4096),
+        ])
+        .manage([
+            channel::<CurrentSellRate>(4096),
+            channel::<CurrentSellRate>(4096),
+            channel::<CurrentSellRate>(4096),
+        ])
         .mount(
             "/",
-            routes![post_current_goods, post_new_event, get_log, prova_invio],
+            routes![
+                post_current_good_labels,
+                get_current_goods,
+                get_current_buy_rate,
+                get_current_sell_rate,
+                post_new_event,
+                get_log,
+                prova_invio,
+                fake_good_labels
+            ],
         )
-        .mount("/", FileServer::from(relative!("frontEnd/build")))
+        .mount(
+            "/marketts",
+            FileServer::from(relative!("frontEnd/build")).rank(2),
+        )
+        .mount("/", FileServer::from(relative!("frontEnd/build")).rank(1))
 }

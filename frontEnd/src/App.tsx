@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from "react";
+import { Routes } from "react-router-dom";
+import { Route } from "react-router-dom";
+import MarketVisualizer from "./Components/MarketVisualizer";
 import "./index.css";
 import { IColumn, ILogEvent } from "./interfaces";
 import Table from "./Table";
@@ -51,9 +54,33 @@ const App = () => {
   }, []);
 
   return (
-    <div className="App">
-      <Table columns={columns} data={data} />
-    </div>
+    <Routes>
+      <Route
+        path="/marketts"
+        element={
+          <>
+            <a href="/">
+              <button>Go to Events!</button>
+            </a>
+            {/*Implementare il binary backoff come nell'esempio */}
+            <MarketVisualizer market="ZSE" />
+            <MarketVisualizer market="BFB" />
+            <MarketVisualizer market="RCNZ" />
+          </>
+        }
+      />
+      <Route
+        path="/"
+        element={
+          <>
+            <Table columns={columns} data={data} />
+            <a href="/marketts">
+              <button>Go to Markets!</button>
+            </a>
+          </>
+        }
+      ></Route>
+    </Routes>
   );
 };
 
