@@ -2,55 +2,20 @@ import React, { useEffect, useMemo, useState } from "react";
 import "./index.css";
 
 import { Line } from "@ant-design/plots";
-
-interface ILogMarket {
-  value: number;
-  time: number;
-  kind: string;
-}
+import { ILogMarket } from "../../interfaces";
 
 interface IProps {
-  path: string;
+  data: ILogMarket[];
 }
 
 const COLORS = ["#1979C9", "#D62A0D", "#FAA219", "#00cb00"];
 
-const Graph = ({ path }: IProps) => {
-  const [dataGraph, setDataGraph] = useState<ILogMarket[]>([]);
-
-  useEffect(() => {
-    let connection = new EventSource(path);
-    let retryTime = 1;
-    console.log("Tentativo per path: ", path);
-    connection.addEventListener("message", (ev) => {
-      const msg = JSON.parse(ev.data);
-      console.log(msg);
-      setDataGraph((prev) => [...prev, msg]);
-    });
-
-    connection.addEventListener("open", () => {
-      console.log("Successo per path: ", path);
-      retryTime = 1;
-    });
-
-    connection.addEventListener("error", () => {
-      console.log("Errore path:", path);
-      connection.close();
-
-      let timeout = retryTime;
-      retryTime = Math.min(64, retryTime * 2);
-      console.log(`connection lost. attempting to reconnect in ${timeout}s`);
-      setTimeout(
-        () => (connection = new EventSource(path)),
-        (() => timeout * 1000)()
-      );
-    });
-  }, []);
+const Graph = ({ data }: IProps) => {
 
   const config = useMemo(() => {
-    console.log(dataGraph);
+    console.log(data);
     return {
-      data: dataGraph,
+      data,
       xField: "time",
       yField: "value",
       seriesField: "kind",
@@ -63,7 +28,7 @@ const Graph = ({ path }: IProps) => {
       },
       color: COLORS,
     };
-  }, [dataGraph]);
+  }, [data]);
 
   return (
     <>

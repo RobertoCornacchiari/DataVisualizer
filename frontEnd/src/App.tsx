@@ -56,16 +56,15 @@ const App = () => {
   return (
     <Routes>
       <Route
-        path="/marketts"
+        path="/marketController"
         element={
           <>
             <a href="/">
               <button>Go to Events!</button>
             </a>
-            {/*Implementare il binary backoff come nell'esempio */}
-            <MarketVisualizer market="ZSE" />
             <MarketVisualizer market="BFB" />
             <MarketVisualizer market="RCNZ" />
+            <MarketVisualizer market="ZSE" />
           </>
         }
       />
@@ -74,7 +73,7 @@ const App = () => {
         element={
           <>
             <Table columns={columns} data={data} />
-            <a href="/marketts">
+            <a href="/marketController">
               <button>Go to Markets!</button>
             </a>
           </>

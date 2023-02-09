@@ -3,8 +3,10 @@ mod interfaces;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::RwLock;
 
+use crate::rocket::futures::StreamExt;
 use interfaces::{CurrentBuyRate, CurrentGood, CurrentSellRate, CustomEvent};
 use rand::{rngs::OsRng, Rng};
+use reqwest_eventsource::{Event as ReqEvent, EventSource};
 use rocket::fs::{relative, FileServer};
 use rocket::response::stream::{Event as RocketEvent, EventStream};
 use rocket::serde::json::Json;
@@ -18,7 +20,7 @@ use unitn_market_2022::event::event::EventKind::{Bought, LockedBuy, LockedSell, 
 use unitn_market_2022::good::good_kind::GoodKind;
 use unitn_market_2022::market::good_label::GoodLabel;
 
-use crate::interfaces::LogEvent;
+use crate::interfaces::{Channels, LogEvent, MsgMultiplexed};
 
 #[macro_use]
 extern crate rocket;
@@ -147,6 +149,62 @@ fn get_current_sell_rate(
     };
     //If the index is 3 the market sent is not valid
     send_event_stream(rec[index % 3].0.subscribe(), index, end)
+}
+
+#[get("/currentMarket/<market>")]
+async fn get_current_market(market: &str, mut end: Shutdown) -> EventStream![] {
+    let index = match market {
+        "BFB" => 0,
+        "RCNZ" => 1,
+        "ZSE" => 2,
+        _ => 3,
+    };
+    let mut source_goods =
+        EventSource::get("http://localhost:8000/currentGoods/".to_string() + market);
+    let mut source_buy_rate =
+        EventSource::get("http://localhost:8000/currentBuyRate/".to_string() + market);
+    let mut source_sell_rate =
+        EventSource::get("http://localhost:8000/currentSellRate/".to_string() + market);
+
+    EventStream! {
+        loop {
+            if index == 3 {
+                break;
+            }
+            let msg =
+                select! {
+                    msg = source_goods.next() => match msg {
+                        Some(content) => match content {
+                            Ok(ReqEvent::Message(message)) => {
+                                MsgMultiplexed{channel: Channels::CurrentGoods, log: message.data}
+                            },
+                            _ => continue,
+                        },
+                        None => break,
+                    },
+                    msg = source_buy_rate.next() => match msg {
+                        Some(content) => match content {
+                            Ok(ReqEvent::Message(message)) => {
+                                MsgMultiplexed{channel: Channels::CurrentBuyRate, log: message.data}
+                            },
+                            _ => continue,
+                        },
+                        None => break,
+                    },
+                    msg = source_sell_rate.next() => match msg {
+                        Some(content) => match content {
+                            Ok(ReqEvent::Message(message)) => {
+                                MsgMultiplexed{channel: Channels::CurrentSellRate, log: message.data}
+                            },
+                            _ => continue,
+                        },
+                        None => break,
+                    },
+                    _ = &mut end => break,
+                };
+            yield RocketEvent::json(&msg);
+        }
+    }
 }
 
 // #[post("/stringa/<market>", data = "<stringa>")]
@@ -328,19 +386,19 @@ fn rocket() -> _ {
         .manage(channel::<LogEvent>(16536).0)
         .manage(Cache(RwLock::new(Vec::new())))
         .manage([
-            channel::<CurrentGood>(4096),
-            channel::<CurrentGood>(4096),
-            channel::<CurrentGood>(4096),
+            channel::<CurrentGood>(16536),
+            channel::<CurrentGood>(16536),
+            channel::<CurrentGood>(16536),
         ])
         .manage([
-            channel::<CurrentBuyRate>(4096),
-            channel::<CurrentBuyRate>(4096),
-            channel::<CurrentBuyRate>(4096),
+            channel::<CurrentBuyRate>(16536),
+            channel::<CurrentBuyRate>(16536),
+            channel::<CurrentBuyRate>(16536),
         ])
         .manage([
-            channel::<CurrentSellRate>(4096),
-            channel::<CurrentSellRate>(4096),
-            channel::<CurrentSellRate>(4096),
+            channel::<CurrentSellRate>(16536),
+            channel::<CurrentSellRate>(16536),
+            channel::<CurrentSellRate>(16536),
         ])
         .mount(
             "/",
@@ -352,11 +410,12 @@ fn rocket() -> _ {
                 post_new_event,
                 get_log,
                 prova_invio,
-                fake_good_labels
+                fake_good_labels,
+                get_current_market
             ],
         )
         .mount(
-            "/marketts",
+            "/marketController",
             FileServer::from(relative!("frontEnd/build")).rank(2),
         )
         .mount("/", FileServer::from(relative!("frontEnd/build")).rank(1))

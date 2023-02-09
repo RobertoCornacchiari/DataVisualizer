@@ -18,3 +18,18 @@ export interface ILogEvent {
   result: boolean;
   error: string;
 }
+
+export interface ILogMarket {
+  value: number;
+  time: number;
+  kind: string;
+}
+
+export enum Channels {
+  CurrentGoods = "CurrentGoods", CurrentBuyRate = "CurrentBuyRate", CurrentSellRate = "CurrentSellRate"
+}
+
+export interface IMsgMultiplexed {
+  channel: Channels;
+  log: ILogMarket;
+}
