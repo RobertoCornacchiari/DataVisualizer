@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use unitn_market_2022::good::good_kind::GoodKind;
+use unitn_market_2022::good::{good_kind::GoodKind, consts::{DEFAULT_EUR_YEN_EXCHANGE_RATE, DEFAULT_EUR_USD_EXCHANGE_RATE, DEFAULT_EUR_YUAN_EXCHANGE_RATE}};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum CustomEventKind {
@@ -61,4 +61,24 @@ pub enum Channels {
 pub struct MsgMultiplexed {
     pub channel: Channels,
     pub log: String,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone)]
+pub struct TraderGood {
+    #[serde(default)]
+    pub time: u32,
+    pub kind: GoodKind,
+    pub quantity: f32,
+}
+
+impl TraderGood {
+    fn calc_value(&self) -> f32 {
+        let exchange = match self.kind {
+            GoodKind::EUR => 1.0,
+            GoodKind::YEN => DEFAULT_EUR_YEN_EXCHANGE_RATE,
+            GoodKind::USD => DEFAULT_EUR_USD_EXCHANGE_RATE,
+            GoodKind::YUAN => DEFAULT_EUR_YUAN_EXCHANGE_RATE,
+        };
+        self.quantity/exchange
+    }
 }

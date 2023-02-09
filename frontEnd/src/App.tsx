@@ -1,58 +1,25 @@
-import React, { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { Routes } from "react-router-dom";
 import { Route } from "react-router-dom";
+import Graph from "./Components/Graph";
 import MarketVisualizer from "./Components/MarketVisualizer";
+import Table from "./Components/Table";
 import "./index.css";
-import { IColumn, ILogEvent } from "./interfaces";
-import Table from "./Table";
-
-const columns: IColumn[] = [
-  {
-    Header: "Events",
-    columns: [
-      {
-        Header: "Day",
-        accessor: "time",
-      },
-      {
-        Header: "Event kind",
-        accessor: "event.kind",
-      },
-      {
-        Header: "Good kind",
-        accessor: "event.good_kind",
-      },
-      {
-        Header: "Market",
-        accessor: "market",
-      },
-      {
-        Header: "Quantity",
-        accessor: "event.quantity",
-      },
-      {
-        Header: "Price",
-        accessor: "event.price",
-      },
-      {
-        Header: "Error",
-        accessor: "error",
-      },
-    ],
-  },
-];
+import { ITraderGood } from "./interfaces";
 
 const App = () => {
-  const [data, setData] = useState<ILogEvent[]>([]);
+  const [data, setData] = useState<ITraderGood[]>([]);
   useEffect(() => {
-    let a = new EventSource("/log");
-    a.addEventListener("message", (ev) => {
+    let connection = new EventSource("/currentTraderGoods");
+    connection.addEventListener("message", (ev) => {
       const msg = JSON.parse(ev.data);
       console.log(msg);
       setData((prev) => [msg, ...prev]);
     });
+    return () => {
+      connection.close();
+    };
   }, []);
-
   return (
     <Routes>
       <Route
@@ -72,7 +39,17 @@ const App = () => {
         path="/"
         element={
           <>
-            <Table columns={columns} data={data} />
+            <div style={{ display: "flex", gap: 12 }}>
+              <div>
+                <Table />
+              </div>
+              <Graph
+                data={data}
+                xField="time"
+                yField="quantity"
+                seriesField="kind"
+              />
+            </div>{" "}
             <a href="/marketController">
               <button>Go to Markets!</button>
             </a>

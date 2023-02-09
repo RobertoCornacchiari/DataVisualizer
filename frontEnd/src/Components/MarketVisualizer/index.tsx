@@ -1,4 +1,3 @@
-import path from "path";
 import React, { useEffect, useState } from "react";
 import { Channels, ILogMarket, IMsgMultiplexed } from "../../interfaces";
 import Graph from "../Graph";
@@ -24,10 +23,10 @@ const MarketVisualizer = ({ market }: IProps) => {
     //Trova il modo di convertire direttamente all'interfaccia corretta, attualmente step intermedio con doppia stringa
 
     connection.addEventListener("message", (ev) => {
-      let received:{channel: string, log: string} = JSON.parse(ev.data);
-      let msg:IMsgMultiplexed = {
+      let received: { channel: string; log: string } = JSON.parse(ev.data);
+      let msg: IMsgMultiplexed = {
         channel: received.channel as Channels,
-        log: JSON.parse(received.log)
+        log: JSON.parse(received.log),
       };
       console.log(msg);
       switch (msg.channel) {
@@ -61,13 +60,33 @@ const MarketVisualizer = ({ market }: IProps) => {
         (() => timeout * 1000)()
       );
     });
+
+    return () => {
+      console.log("Chiudi connessione");
+      connection.close();
+    };
   }, []);
 
   return (
     <div className="graphContainer">
-      <Graph data={dataCurrentGoods}/>
-      <Graph data={dataCurrentBuyRate}/>
-      <Graph data={dataCurrentSellRate}/>
+      <Graph
+        data={dataCurrentGoods}
+        xField="time"
+        yField="value"
+        seriesField="kind"
+      />
+      <Graph
+        data={dataCurrentBuyRate}
+        xField="time"
+        yField="value"
+        seriesField="kind"
+      />
+      <Graph
+        data={dataCurrentSellRate}
+        xField="time"
+        yField="value"
+        seriesField="kind"
+      />
     </div>
   );
 };

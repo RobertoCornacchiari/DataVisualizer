@@ -33,3 +33,9 @@ export interface IMsgMultiplexed {
   channel: Channels;
   log: ILogMarket;
 }
+
+export interface ITraderGood {
+  time: number;
+  kind: string;
+  quantity: number;
+}

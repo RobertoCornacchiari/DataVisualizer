@@ -1,25 +1,29 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import "./index.css";
 
 import { Line } from "@ant-design/plots";
-import { ILogMarket } from "../../interfaces";
+import { ILogMarket, ITraderGood } from "../../interfaces";
 
 interface IProps {
-  data: ILogMarket[];
+  data: (ILogMarket | ITraderGood)[];
+  xField: string;
+  yField: string;
+  seriesField: string;
 }
 
 const COLORS = ["#1979C9", "#D62A0D", "#FAA219", "#00cb00"];
 
-const Graph = ({ data }: IProps) => {
+const Graph = ({ data, xField, yField, seriesField }: IProps) => {
 
   const config = useMemo(() => {
     console.log(data);
     return {
       data,
-      xField: "time",
-      yField: "value",
-      seriesField: "kind",
-      width: 500,
+      xField,
+      yField,
+      seriesField,
+      width: 550,
+      height: 300,
       yAxis: {
         label: {
           formatter: (v: string) =>
