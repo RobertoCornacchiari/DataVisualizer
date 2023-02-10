@@ -23,7 +23,7 @@ const App = () => {
       const msg: ITraderGood = JSON.parse(ev.data);
       msg.time = "" + msg.time;
       console.log("Current trader goods:", msg);
-      setData((prev) => [msg, ...prev]);
+      setData((prev) => [...prev, msg]);
       setLastData(new Map(lastData.set(msg.kind, msg.quantity)));
     });
     return () => {
