@@ -1,8 +1,7 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTable, usePagination } from "react-table";
 import { IColumn, ILogEvent } from "../../interfaces";
-import './index.css';
+import "./index.css";
 
 const columns: IColumn[] = [
   {
@@ -41,8 +40,10 @@ const columns: IColumn[] = [
 ];
 
 const Table = () => {
-
   const [data, setData] = useState<ILogEvent[]>([]);
+  const [stop, setStop] = useState<boolean>(false);
+  const [dataToDisplay, setDataToDisplay] = useState<ILogEvent[]>([]);
+
   useEffect(() => {
     let connection = new EventSource("/log");
     connection.addEventListener("message", (ev) => {
@@ -50,10 +51,14 @@ const Table = () => {
       console.log(msg);
       setData((prev) => [msg, ...prev]);
     });
-    return(() => {
+    return () => {
       connection.close();
-    })
+    };
   }, []);
+
+  useEffect(() => {
+    if (!stop) setDataToDisplay(data);
+  }, [stop, data]);
 
   // Use the state and functions returned from useTable to build the UI
   const {
@@ -74,7 +79,7 @@ const Table = () => {
   } = useTable(
     {
       columns,
-      data,
+      data: dataToDisplay,
       initialState: { pageIndex: 0, pageSize: 10 },
     },
     usePagination
@@ -111,16 +116,32 @@ const Table = () => {
         </tbody>
       </table>
       <div className="button_container">
-        <button className="button" onClick={() => gotoPage(0)} disabled={!canPreviousPage}>
+        <button
+          className="button"
+          onClick={() => gotoPage(0)}
+          disabled={!canPreviousPage}
+        >
           {"<<"}
         </button>{" "}
-        <button className="button" onClick={() => previousPage()} disabled={!canPreviousPage}>
+        <button
+          className="button"
+          onClick={() => previousPage()}
+          disabled={!canPreviousPage}
+        >
           {"<"}
         </button>{" "}
-        <button className="button" onClick={() => nextPage()} disabled={!canNextPage}>
+        <button
+          className="button"
+          onClick={() => nextPage()}
+          disabled={!canNextPage}
+        >
           {">"}
         </button>{" "}
-        <button className="button" onClick={() => gotoPage(pageCount - 1)} disabled={!canNextPage}>
+        <button
+          className="button"
+          onClick={() => gotoPage(pageCount - 1)}
+          disabled={!canNextPage}
+        >
           {">>"}
         </button>{" "}
         <span>
@@ -134,7 +155,7 @@ const Table = () => {
           onChange={(e) => {
             setPageSize(Number(e.target.value));
           }}
-          className="select" 
+          className="select"
         >
           {[10, 20, 30, 40, 50].map((pageSize) => (
             <option key={pageSize} value={pageSize}>
@@ -142,8 +163,18 @@ const Table = () => {
             </option>
           ))}
         </select>
-        <button className="button" onClick={() => setData([])} disabled={data.length === 0}>
-            DEL
+        <button
+          className="button"
+          onClick={() => setData([])}
+          disabled={data.length === 0}
+        >
+          DEL
+        </button>
+        <button
+          className="button"
+          onClick={() => setStop((prev) => !prev)}
+        >
+          {stop ? "RESUME" : "PAUSE"}
         </button>
       </div>
     </>

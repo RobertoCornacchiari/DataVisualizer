@@ -16,7 +16,6 @@ const COLORS = ["#1979C9", "#D62A0D", "#FAA219", "#00cb00"];
 const Graph = ({ data, xField, yField, seriesField }: IProps) => {
 
   const config = useMemo(() => {
-    console.log(data);
     return {
       data,
       xField,

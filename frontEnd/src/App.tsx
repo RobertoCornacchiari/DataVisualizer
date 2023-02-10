@@ -21,7 +21,7 @@ const App = () => {
     let connection = new EventSource("/currentTraderGoods");
     connection.addEventListener("message", (ev) => {
       const msg: ITraderGood = JSON.parse(ev.data);
-      console.log(msg);
+      console.log("Current trader goods:", msg);
       setData((prev) => [msg, ...prev]);
       setLastData(new Map(lastData.set(msg.kind, msg.quantity)));
     });
@@ -45,7 +45,6 @@ const App = () => {
   }, []);
 
   const dataPie = useMemo(() => {
-    console.log(lastData);
     return Array.from(
       lastData,
       ([key, value]) =>
@@ -76,7 +75,13 @@ const App = () => {
         element={
           <>
             <div style={{ display: "flex", gap: 12 }}>
-              <div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
+              >
                 <Table />
               </div>
               <div>

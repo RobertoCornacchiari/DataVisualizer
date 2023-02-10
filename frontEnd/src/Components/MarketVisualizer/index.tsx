@@ -28,7 +28,7 @@ const MarketVisualizer = ({ market }: IProps) => {
         channel: received.channel as Channels,
         log: JSON.parse(received.log),
       };
-      console.log(msg);
+      console.log("Market:", market, "\nChannel: ", msg.channel, "\n", msg);
       switch (msg.channel) {
         case Channels.CurrentGoods:
           setDataCurrentGoods((prev) => [...prev, msg.log]);
