@@ -1,5 +1,6 @@
 mod interfaces;
 
+use std::iter::Map;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::RwLock;
 
@@ -8,6 +9,7 @@ use interfaces::{CurrentBuyRate, CurrentGood, CurrentSellRate, TraderGood};
 use rand::{rngs::OsRng, Rng};
 use reqwest_eventsource::{Event as ReqEvent, EventSource};
 use rocket::fs::{relative, FileServer};
+use rocket::response::content::RawJson;
 use rocket::response::stream::{Event as RocketEvent, EventStream};
 use rocket::serde::json::Json;
 use rocket::tokio::select;
@@ -15,6 +17,9 @@ use rocket::tokio::sync::broadcast::{channel, error::RecvError, Sender};
 use rocket::{Shutdown, State};
 use serde::Serialize;
 use tokio::sync::broadcast::Receiver;
+use unitn_market_2022::good::consts::{
+    DEFAULT_EUR_USD_EXCHANGE_RATE, DEFAULT_EUR_YEN_EXCHANGE_RATE, DEFAULT_EUR_YUAN_EXCHANGE_RATE,
+};
 use unitn_market_2022::good::good_kind::GoodKind;
 use unitn_market_2022::market::good_label::GoodLabel;
 
@@ -73,9 +78,13 @@ fn post_current_good_labels(
     });
 }
 
-#[post("/traderGoods", data="<goods>")]
-fn post_trader_goods(mut goods: Json<Vec<TraderGood>>, time: &State<Time>, queue: &State<Sender<TraderGood>>) {
-
+//Function used to receive the goods owned by the trader
+#[post("/traderGoods", data = "<goods>")]
+fn post_trader_goods(
+    mut goods: Json<Vec<TraderGood>>,
+    time: &State<Time>,
+    queue: &State<Sender<TraderGood>>,
+) {
     let time = time.0.load(Ordering::Relaxed);
     goods.iter_mut().for_each(|good| {
         good.time = time;
@@ -85,10 +94,7 @@ fn post_trader_goods(mut goods: Json<Vec<TraderGood>>, time: &State<Time>, queue
 
 //Function used to send to the client the current goods held by the market referenced
 #[get("/currentTraderGoods")]
-fn get_trader_goods(
-    rec: &State<Sender<TraderGood>>,
-    mut end: Shutdown,
-) -> EventStream![] {
+fn get_trader_goods(rec: &State<Sender<TraderGood>>, mut end: Shutdown) -> EventStream![] {
     let mut rx = rec.subscribe();
     EventStream! {
         loop {
@@ -104,6 +110,19 @@ fn get_trader_goods(
             yield RocketEvent::json(&msg);
         }
     }
+}
+
+//Function that provides the current exchange rates (the defaults) to the clients
+#[get("/defaultExchange")]
+fn get_default_exchange() -> Json<Vec<(GoodKind, f32)>> {
+    let arr: Vec<(GoodKind, f32)> = [
+        (GoodKind::EUR, 1.0),
+        (GoodKind::USD, DEFAULT_EUR_USD_EXCHANGE_RATE),
+        (GoodKind::YEN, DEFAULT_EUR_YEN_EXCHANGE_RATE),
+        (GoodKind::YUAN, DEFAULT_EUR_YUAN_EXCHANGE_RATE),
+    ]
+    .to_vec();
+    Json(arr)
 }
 
 //Function that provides the eventStream for all the kind of information regarding the market (currentGoods, exchangeBuyRate, exchangeSellRate)
@@ -353,7 +372,8 @@ fn rocket() -> _ {
                 get_log,
                 fake_good_labels,
                 post_trader_goods,
-                get_trader_goods
+                get_trader_goods,
+                get_default_exchange
             ],
         )
         .mount(
