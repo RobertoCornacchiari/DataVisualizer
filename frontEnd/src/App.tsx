@@ -21,6 +21,7 @@ const App = () => {
     let connection = new EventSource("/currentTraderGoods");
     connection.addEventListener("message", (ev) => {
       const msg: ITraderGood = JSON.parse(ev.data);
+      msg.time = "" + msg.time;
       console.log("Current trader goods:", msg);
       setData((prev) => [msg, ...prev]);
       setLastData(new Map(lastData.set(msg.kind, msg.quantity)));
@@ -61,12 +62,14 @@ const App = () => {
         path="/marketController"
         element={
           <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <MarketVisualizer market="BFB" />
+              <MarketVisualizer market="RCNZ" />
+              <MarketVisualizer market="ZSE" />
+            </div>
             <a href="/">
               <button>Go to Events!</button>
             </a>
-            <MarketVisualizer market="BFB" />
-            <MarketVisualizer market="RCNZ" />
-            <MarketVisualizer market="ZSE" />
           </>
         }
       />

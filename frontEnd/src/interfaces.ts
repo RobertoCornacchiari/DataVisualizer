@@ -21,7 +21,7 @@ export interface ILogEvent {
 
 export interface ILogMarket {
   value: number;
-  time: number;
+  time: string;
   kind: string;
 }
 
@@ -35,7 +35,7 @@ export interface IMsgMultiplexed {
 }
 
 export interface ITraderGood {
-  time: number;
+  time: string;
   kind: string;
   quantity: number;
 }

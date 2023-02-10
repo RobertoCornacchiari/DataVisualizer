@@ -14,24 +14,21 @@ interface IProps {
 const COLORS = ["#1979C9", "#D62A0D", "#FAA219", "#00cb00"];
 
 const Graph = ({ data, xField, yField, seriesField }: IProps) => {
-
-  const config = useMemo(() => {
-    return {
-      data,
-      xField,
-      yField,
-      seriesField,
-      width: 550,
-      height: 300,
-      yAxis: {
-        label: {
-          formatter: (v: string) =>
-            `${v}`.replace(/\d{1,3}(?=(\d{3})+$)/g, (s) => `${s},`),
-        },
+  const config = {
+    data,
+    xField,
+    yField,
+    seriesField,
+    width: 550,
+    height: 290,
+    yAxis: {
+      label: {
+        formatter: (v: string) =>
+          `${v}`.replace(/\d{1,3}(?=(\d{3})+$)/g, (s) => `${s},`),
       },
-      color: COLORS,
-    };
-  }, [data]);
+    },
+    color: COLORS,
+  };
 
   return (
     <>

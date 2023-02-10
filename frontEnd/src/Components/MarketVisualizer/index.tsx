@@ -16,6 +16,18 @@ const MarketVisualizer = ({ market }: IProps) => {
     []
   );
 
+  const [size, setSize] = useState<number>(0);
+
+  const filter = (data: ILogMarket[], size: number): ILogMarket[] => {
+    if (size === 0) return data;
+    //The 4 is there because there are 4 goodkinds
+    else {
+      let a = data.slice(-Math.min(4 * size, data.length));
+      console.log("Slice:", a);
+      return a;
+    }
+  };
+
   useEffect(() => {
     let connection = new EventSource("currentMarket/" + market);
     let retryTime = 1;
@@ -28,6 +40,7 @@ const MarketVisualizer = ({ market }: IProps) => {
         channel: received.channel as Channels,
         log: JSON.parse(received.log),
       };
+      msg.log.time = "" + msg.log.time;
       console.log("Market:", market, "\nChannel: ", msg.channel, "\n", msg);
       switch (msg.channel) {
         case Channels.CurrentGoods:
@@ -68,25 +81,58 @@ const MarketVisualizer = ({ market }: IProps) => {
   }, []);
 
   return (
-    <div className="graphContainer">
-      <Graph
-        data={dataCurrentGoods}
-        xField="time"
-        yField="value"
-        seriesField="kind"
-      />
-      <Graph
-        data={dataCurrentBuyRate}
-        xField="time"
-        yField="value"
-        seriesField="kind"
-      />
-      <Graph
-        data={dataCurrentSellRate}
-        xField="time"
-        yField="value"
-        seriesField="kind"
-      />
+    <div className="boxGraph">
+      <div className="graphContainer">
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
+          <h3>{market}</h3>
+          <select
+            value={size}
+            onChange={(e) => {
+              setSize(Number(e.target.value));
+            }}
+            className="select"
+          >
+            {["All", 10, 25, 50, 100].map((pageSize) => (
+              <option key={pageSize} value={pageSize}>
+                Show {pageSize}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          Goods quantity
+          <Graph
+            data={filter(dataCurrentGoods, size)}
+            xField="time"
+            yField="value"
+            seriesField="kind"
+          />
+        </div>
+        <div>
+          Exchange buy rate
+          <Graph
+            data={filter(dataCurrentBuyRate, size)}
+            xField="time"
+            yField="value"
+            seriesField="kind"
+          />
+        </div>
+        <div>
+          Exchange sell rate
+          <Graph
+            data={filter(dataCurrentSellRate, size)}
+            xField="time"
+            yField="value"
+            seriesField="kind"
+          />
+        </div>
+      </div>
     </div>
   );
 };
