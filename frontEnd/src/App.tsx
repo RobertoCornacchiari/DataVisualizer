@@ -83,6 +83,7 @@ const App = () => {
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
+                  gap: 12,
                 }}
               >
                 <Table />
@@ -94,6 +95,8 @@ const App = () => {
                   yField="quantity"
                   seriesField="kind"
                 />
+                <br />
+                Wallet value
                 <Pie data={dataPie} />
                 <a href="/marketController">
                   <button>Go to Markets!</button>

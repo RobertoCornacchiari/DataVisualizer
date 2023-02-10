@@ -1,15 +1,13 @@
 mod interfaces;
 
-use std::iter::Map;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::RwLock;
 
 use crate::rocket::futures::StreamExt;
-use interfaces::{CurrentBuyRate, CurrentGood, CurrentSellRate, TraderGood};
+use interfaces::{CurrentBuyRate, CurrentGood, CurrentSellRate, TraderGood, Time, CacheLogEvent, CacheTraderGood};
 use rand::{rngs::OsRng, Rng};
 use reqwest_eventsource::{Event as ReqEvent, EventSource};
 use rocket::fs::{relative, FileServer};
-use rocket::response::content::RawJson;
 use rocket::response::stream::{Event as RocketEvent, EventStream};
 use rocket::serde::json::Json;
 use rocket::tokio::select;
@@ -28,16 +26,10 @@ use crate::interfaces::{Channels, LogEvent, MsgMultiplexed};
 #[macro_use]
 extern crate rocket;
 
-//Struct used to count the days passed during the simulation
-struct Time(AtomicU32);
-
-//Struct used to store in memory the logs, in order to provied them to clients that connect after the simulation started
-struct Cache(RwLock<Vec<LogEvent>>);
-
 //Function used to receive from the trader the current GoodLabels held by the market referenced
 #[post("/currentGoodLabels/<market>", data = "<goods>")]
 fn post_current_good_labels(
-    goods: Json<Vec<GoodLabel>>,
+    mut goods: Json<Vec<GoodLabel>>,
     market: &str,
     current_goods: &State<[Sender<CurrentGood>; 3]>,
     current_buy_rate: &State<[Sender<CurrentBuyRate>; 3]>,
@@ -51,8 +43,9 @@ fn post_current_good_labels(
         _ => return,
     };
     //I add all the goodLabels to the channels
+    goods.sort_by(|a, b| a.good_kind.to_string().cmp(&b.good_kind.to_string()));
     goods.iter().for_each(|good_label| {
-        let time = time.0.load(Ordering::Relaxed);
+        let time = time.get();
         let kind = good_label.good_kind;
 
         let c_goods = CurrentGood {
@@ -84,21 +77,34 @@ fn post_trader_goods(
     mut goods: Json<Vec<TraderGood>>,
     time: &State<Time>,
     queue: &State<Sender<TraderGood>>,
+    cache: &State<CacheTraderGood>,
 ) {
-    let time = time.0.load(Ordering::Relaxed);
+    let time = time.get();
+    
+    goods.sort_by(|a, b| a.kind.to_string().cmp(&b.kind.to_string()));
     goods.iter_mut().for_each(|good| {
         good.time = time;
         let _res = queue.send(*good);
+        cache.add(good.clone());
     });
 }
 
 //Function used to send to the client the current goods held by the market referenced
 #[get("/currentTraderGoods")]
-fn get_trader_goods(rec: &State<Sender<TraderGood>>, mut end: Shutdown) -> EventStream![] {
+fn get_trader_goods(
+    rec: &State<Sender<TraderGood>>,
+    mut end: Shutdown,
+    cache: &State<CacheTraderGood>,
+) -> EventStream![] {
     let mut rx = rec.subscribe();
+    //Clone of the current situation in order to provide to the client all the states that have been previously recorded
+    let mut cop = cache.clone_vec();
     EventStream! {
         loop {
-            let msg =
+            //If there are some old states to send
+            let msg = if cop.len() > 0 {
+                cop.remove(0)
+            } else { 
                 select! {
                 msg = rx.recv() => match msg {
                     Ok(msg) => msg,
@@ -106,7 +112,7 @@ fn get_trader_goods(rec: &State<Sender<TraderGood>>, mut end: Shutdown) -> Event
                     Err(RecvError::Lagged(_)) => continue,
                 },
                 _ = &mut end => break,
-            };
+            }};
             yield RocketEvent::json(&msg);
         }
     }
@@ -279,7 +285,7 @@ async fn fake_good_labels(market: &str, time: &State<Time>) {
         .send()
         .await;
 
-    time.0.fetch_add(1, Ordering::Acquire);
+    time.increment_one();
 }
 
 //All events performed by the trader are sent to this function
@@ -288,19 +294,18 @@ async fn post_new_event(
     mut event: Json<LogEvent>,
     queue: &State<Sender<LogEvent>>,
     time: &State<Time>,
-    cache: &State<Cache>,
+    cache: &State<CacheLogEvent>,
 ) {
     //Check if the action had a positive result (no error). If so, increment the day
     if event.result {
-        event.time = time.0.fetch_add(1, Ordering::Relaxed) + 1;
+        event.time = time.increment_one();
     } else {
-        event.time = time.0.load(Ordering::Relaxed);
+        event.time = time.get();
     }
     //Send the event to the receivers
     let content = event.into_inner();
     let _res = queue.send(content.clone());
-    let mut cache_lock = cache.0.write().unwrap();
-    (*cache_lock).push(content);
+    cache.add(content)
 }
 
 //Function that provides the event received from the trader
@@ -308,14 +313,12 @@ async fn post_new_event(
 fn get_log<'a>(
     queue: &State<Sender<LogEvent>>,
     mut end: Shutdown,
-    cache: &State<Cache>,
+    cache: &State<CacheLogEvent>,
 ) -> EventStream![] {
     //Subscribe to the queue for future Logs
     let mut rx = queue.subscribe();
     //Clone of the current situation in order to provide to the client all the Logs that have been previously recorded
-    let cache_lock = cache.0.read().unwrap();
-    let mut cop = (*cache_lock).clone();
-    drop(cache_lock);
+    let mut cop = cache.clone_vec();
     EventStream! {
         loop {
             //If there are some old Logs to send
@@ -343,8 +346,9 @@ fn rocket() -> _ {
     rocket::build()
         .manage(Time(AtomicU32::new(0)))
         .manage(channel::<LogEvent>(16536).0)
+        .manage(CacheLogEvent(RwLock::new(Vec::new())))
         .manage(channel::<TraderGood>(16536).0)
-        .manage(Cache(RwLock::new(Vec::new())))
+        .manage(CacheTraderGood(RwLock::new(Vec::new())))
         .manage([
             channel::<CurrentGood>(16536).0,
             channel::<CurrentGood>(16536).0,

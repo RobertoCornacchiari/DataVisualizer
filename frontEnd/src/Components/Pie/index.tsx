@@ -6,6 +6,8 @@ interface IProps {
   data: ITraderGood[];
 }
 
+const COLORS = ["#1979C9", "#D62A0D", "#FAA219", "#00cb00"];
+
 const Pie = ({ data }: IProps) => {
   const config = useMemo(() => {
     return {
@@ -27,6 +29,7 @@ const Pie = ({ data }: IProps) => {
           type: "element-active",
         },
       ],
+      color: COLORS,
     };
   }, [data]);
   return <PieChart {...config} />;
