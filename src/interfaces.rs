@@ -1,10 +1,10 @@
-use std::sync::{
+use std::{sync::{
     atomic::{AtomicU32, Ordering},
     RwLock,
-};
+}, fmt::{Display, Formatter}};
 
 use serde::{Deserialize, Serialize};
-use unitn_market_2022::good::good_kind::GoodKind;
+use unitn_market_2022::good::{good_kind::GoodKind, consts::{DEFAULT_EUR_USD_EXCHANGE_RATE, DEFAULT_EUR_YEN_EXCHANGE_RATE, DEFAULT_EUR_YUAN_EXCHANGE_RATE}};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum CustomEventKind {
@@ -69,11 +69,40 @@ pub struct MsgMultiplexed {
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone)]
-pub struct TraderGood {
+pub enum TraderGraphSeries {
+    EUR, USD, YEN, YUAN, TOT
+}
+
+impl Display for TraderGraphSeries {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TraderGraphSeries::EUR => { write!(f, "EUR") }
+            TraderGraphSeries::YEN => { write!(f, "YEN") }
+            TraderGraphSeries::USD => { write!(f, "USD") }
+            TraderGraphSeries::YUAN => { write!(f, "YUAN") }
+            TraderGraphSeries::TOT => { write!(f, "TOT") }
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone)]
+pub struct TraderInfo {
     #[serde(default)]
     pub time: u32,
-    pub kind: GoodKind,
+    pub kind: TraderGraphSeries,
     pub quantity: f32,
+}
+
+impl TraderInfo {
+    pub fn calc_value(&self) -> f32 {
+        self.quantity / match self.kind {
+            TraderGraphSeries::EUR => 1.0,
+            TraderGraphSeries::USD => DEFAULT_EUR_USD_EXCHANGE_RATE,
+            TraderGraphSeries::YEN => DEFAULT_EUR_YEN_EXCHANGE_RATE,
+            TraderGraphSeries::YUAN => DEFAULT_EUR_YUAN_EXCHANGE_RATE,
+            TraderGraphSeries::TOT => 1.0,
+        }
+    }
 }
 
 //Struct used to count the days passed during the simulation
@@ -108,21 +137,65 @@ impl CacheLogEvent {
         drop(lock);
         copy
     }
+
+    pub fn iter(&self) -> IterCacheLogEvent {
+        IterCacheLogEvent {
+            cache: self.clone_vec()
+        }
+    }
+}
+
+pub struct IterCacheLogEvent {
+    cache: Vec<LogEvent>
+}
+
+impl Iterator for IterCacheLogEvent {
+    type Item = LogEvent;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cache.len() > 0 {
+            Some(self.cache.remove(0))
+        } else {
+            None
+        }
+    }
 }
 
 //Struct used to store in memory the state of the trader each day, in order to provied them to clients that connect after the simulation started
-pub struct CacheTraderGood(pub RwLock<Vec<TraderGood>>);
+pub struct CacheTraderInfo(pub RwLock<Vec<TraderInfo>>);
 
-impl CacheTraderGood {
-    pub fn add(&self, value: TraderGood) {
+impl CacheTraderInfo {
+    pub fn add(&self, value: TraderInfo) {
         let mut cache_lock = self.0.write().unwrap();
         (*cache_lock).push(value);
     }
 
-    pub fn clone_vec(&self) -> Vec<TraderGood> {
+    pub fn clone_vec(&self) -> Vec<TraderInfo> {
         let lock = self.0.read().unwrap();
         let copy = (*lock).clone();
         drop(lock);
         copy
+    }
+
+    pub fn iter(&self) -> IterCacheTraderInfo {
+        IterCacheTraderInfo {
+            cache: self.clone_vec()
+        }
+    }
+}
+
+pub struct IterCacheTraderInfo {
+    cache: Vec<TraderInfo>
+}
+
+impl Iterator for IterCacheTraderInfo {
+    type Item = TraderInfo;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cache.len() > 0 {
+            Some(self.cache.remove(0))
+        } else {
+            None
+        }
     }
 }

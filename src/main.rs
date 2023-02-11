@@ -1,10 +1,12 @@
 mod interfaces;
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::AtomicU32;
 use std::sync::RwLock;
 
 use crate::rocket::futures::StreamExt;
-use interfaces::{CurrentBuyRate, CurrentGood, CurrentSellRate, TraderGood, Time, CacheLogEvent, CacheTraderGood};
+use interfaces::{
+    CacheLogEvent, CacheTraderInfo, CurrentBuyRate, CurrentGood, CurrentSellRate, Time, TraderInfo,
+};
 use rand::{rngs::OsRng, Rng};
 use reqwest_eventsource::{Event as ReqEvent, EventSource};
 use rocket::fs::{relative, FileServer};
@@ -74,44 +76,55 @@ fn post_current_good_labels(
 //Function used to receive the goods owned by the trader
 #[post("/traderGoods", data = "<goods>")]
 fn post_trader_goods(
-    mut goods: Json<Vec<TraderGood>>,
+    mut goods: Json<Vec<TraderInfo>>,
     time: &State<Time>,
-    queue: &State<Sender<TraderGood>>,
-    cache: &State<CacheTraderGood>,
+    queue: &State<Sender<TraderInfo>>,
+    cache: &State<CacheTraderInfo>,
 ) {
     let time = time.get();
-    
+
     goods.sort_by(|a, b| a.kind.to_string().cmp(&b.kind.to_string()));
+    let mut tot = 0.0;
+
     goods.iter_mut().for_each(|good| {
         good.time = time;
+        tot += good.calc_value();
         let _res = queue.send(*good);
         cache.add(good.clone());
     });
+    let total = TraderInfo {
+        time,
+        kind: interfaces::TraderGraphSeries::TOT,
+        quantity: tot,
+    };
+    let _res = queue.send(total);
+    cache.add(total);
 }
 
 //Function used to send to the client the current goods held by the market referenced
 #[get("/currentTraderGoods")]
 fn get_trader_goods(
-    rec: &State<Sender<TraderGood>>,
+    rec: &State<Sender<TraderInfo>>,
     mut end: Shutdown,
-    cache: &State<CacheTraderGood>,
+    cache: &State<CacheTraderInfo>,
 ) -> EventStream![] {
     let mut rx = rec.subscribe();
     //Clone of the current situation in order to provide to the client all the states that have been previously recorded
-    let mut cop = cache.clone_vec();
+    let mut cop = cache.iter();
     EventStream! {
         loop {
             //If there are some old states to send
-            let msg = if cop.len() > 0 {
-                cop.remove(0)
-            } else { 
-                select! {
-                msg = rx.recv() => match msg {
-                    Ok(msg) => msg,
-                    Err(RecvError::Closed) => break,
-                    Err(RecvError::Lagged(_)) => continue,
-                },
-                _ = &mut end => break,
+            let msg = match cop.next() {
+                Some(event) => event,
+                None => {
+                    select! {
+                        msg = rx.recv() => match msg {
+                            Ok(msg) => msg,
+                            Err(RecvError::Closed) => break,
+                            Err(RecvError::Lagged(_)) => continue,
+                        },
+                        _ = &mut end => break,
+                }
             }};
             yield RocketEvent::json(&msg);
         }
@@ -318,22 +331,22 @@ fn get_log<'a>(
     //Subscribe to the queue for future Logs
     let mut rx = queue.subscribe();
     //Clone of the current situation in order to provide to the client all the Logs that have been previously recorded
-    let mut cop = cache.clone_vec();
+    let mut cop = cache.iter();
     EventStream! {
         loop {
             //If there are some old Logs to send
-            let msg = if cop.len() > 0 {
-                cop.remove(0)
-            }
-            //If there are no old Logs keep listening for next
-            else {
-                select! {
-                msg = rx.recv() => match msg {
-                    Ok(msg) => msg,
-                    Err(RecvError::Closed) => break,
-                    Err(RecvError::Lagged(_)) => continue,
-                },
-                _ = &mut end => break,
+            let msg = match cop.next() {
+                Some(event) => event,
+                None => {
+                    //If there are no old Logs keep listening for next
+                    select! {
+                        msg = rx.recv() => match msg {
+                            Ok(msg) => msg,
+                            Err(RecvError::Closed) => break,
+                            Err(RecvError::Lagged(_)) => continue,
+                        },
+                        _ = &mut end => break,
+                }
             }};
 
             yield RocketEvent::json(&msg);
@@ -347,8 +360,8 @@ fn rocket() -> _ {
         .manage(Time(AtomicU32::new(0)))
         .manage(channel::<LogEvent>(16536).0)
         .manage(CacheLogEvent(RwLock::new(Vec::new())))
-        .manage(channel::<TraderGood>(16536).0)
-        .manage(CacheTraderGood(RwLock::new(Vec::new())))
+        .manage(channel::<TraderInfo>(16536).0)
+        .manage(CacheTraderInfo(RwLock::new(Vec::new())))
         .manage([
             channel::<CurrentGood>(16536).0,
             channel::<CurrentGood>(16536).0,

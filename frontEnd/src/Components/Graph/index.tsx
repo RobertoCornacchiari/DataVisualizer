@@ -11,7 +11,7 @@ interface IProps {
   seriesField: string;
 }
 
-const COLORS = ["#1979C9", "#D62A0D", "#FAA219", "#00cb00"];
+const COLORS = ["#1979C9", "#D62A0D", "#FAA219", "#00cb00", "#f700ff"];
 
 const Graph = ({ data, xField, yField, seriesField }: IProps) => {
   const config = {
