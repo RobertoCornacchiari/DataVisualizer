@@ -1,10 +1,19 @@
-use std::{sync::{
-    atomic::{AtomicU32, Ordering, AtomicBool},
-    RwLock,
-}, fmt::{Display, Formatter}};
+use std::{
+    fmt::{Display, Formatter},
+    sync::{
+        atomic::{AtomicBool, AtomicU32, Ordering},
+        RwLock,
+    },
+};
 
 use serde::{Deserialize, Serialize};
-use unitn_market_2022::good::{good_kind::GoodKind, consts::{DEFAULT_EUR_USD_EXCHANGE_RATE, DEFAULT_EUR_YEN_EXCHANGE_RATE, DEFAULT_EUR_YUAN_EXCHANGE_RATE}};
+use unitn_market_2022::good::{
+    consts::{
+        DEFAULT_EUR_USD_EXCHANGE_RATE, DEFAULT_EUR_YEN_EXCHANGE_RATE,
+        DEFAULT_EUR_YUAN_EXCHANGE_RATE,
+    },
+    good_kind::GoodKind,
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum CustomEventKind {
@@ -70,17 +79,31 @@ pub struct MsgMultiplexed {
 
 #[derive(Serialize, Deserialize, Copy, Clone)]
 pub enum TraderGraphSeries {
-    EUR, USD, YEN, YUAN, TOT
+    EUR,
+    USD,
+    YEN,
+    YUAN,
+    TOT,
 }
 
 impl Display for TraderGraphSeries {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            TraderGraphSeries::EUR => { write!(f, "EUR") }
-            TraderGraphSeries::YEN => { write!(f, "YEN") }
-            TraderGraphSeries::USD => { write!(f, "USD") }
-            TraderGraphSeries::YUAN => { write!(f, "YUAN") }
-            TraderGraphSeries::TOT => { write!(f, "TOT") }
+            TraderGraphSeries::EUR => {
+                write!(f, "EUR")
+            }
+            TraderGraphSeries::YEN => {
+                write!(f, "YEN")
+            }
+            TraderGraphSeries::USD => {
+                write!(f, "USD")
+            }
+            TraderGraphSeries::YUAN => {
+                write!(f, "YUAN")
+            }
+            TraderGraphSeries::TOT => {
+                write!(f, "TOT")
+            }
         }
     }
 }
@@ -95,13 +118,14 @@ pub struct TraderInfo {
 
 impl TraderInfo {
     pub fn calc_value(&self) -> f32 {
-        self.quantity / match self.kind {
-            TraderGraphSeries::EUR => 1.0,
-            TraderGraphSeries::USD => DEFAULT_EUR_USD_EXCHANGE_RATE,
-            TraderGraphSeries::YEN => DEFAULT_EUR_YEN_EXCHANGE_RATE,
-            TraderGraphSeries::YUAN => DEFAULT_EUR_YUAN_EXCHANGE_RATE,
-            TraderGraphSeries::TOT => 1.0,
-        }
+        self.quantity
+            / match self.kind {
+                TraderGraphSeries::EUR => 1.0,
+                TraderGraphSeries::USD => DEFAULT_EUR_USD_EXCHANGE_RATE,
+                TraderGraphSeries::YEN => DEFAULT_EUR_YEN_EXCHANGE_RATE,
+                TraderGraphSeries::YUAN => DEFAULT_EUR_YUAN_EXCHANGE_RATE,
+                TraderGraphSeries::TOT => 1.0,
+            }
     }
 }
 
@@ -140,13 +164,13 @@ impl CacheLogEvent {
 
     pub fn iter(&self) -> IterCacheLogEvent {
         IterCacheLogEvent {
-            cache: self.clone_vec()
+            cache: self.clone_vec(),
         }
     }
 }
 
 pub struct IterCacheLogEvent {
-    cache: Vec<LogEvent>
+    cache: Vec<LogEvent>,
 }
 
 impl Iterator for IterCacheLogEvent {
@@ -179,13 +203,13 @@ impl CacheTraderInfo {
 
     pub fn iter(&self) -> IterCacheTraderInfo {
         IterCacheTraderInfo {
-            cache: self.clone_vec()
+            cache: self.clone_vec(),
         }
     }
 }
 
 pub struct IterCacheTraderInfo {
-    cache: Vec<TraderInfo>
+    cache: Vec<TraderInfo>,
 }
 
 impl Iterator for IterCacheTraderInfo {
@@ -204,14 +228,16 @@ impl Iterator for IterCacheTraderInfo {
 pub struct Block(pub AtomicBool);
 
 #[derive(Serialize, Deserialize)]
-pub struct Delay (pub AtomicU32);
+pub struct Delay {
+    pub delay: AtomicU32,
+}
 
 impl Delay {
     pub fn set(&self, value: u32) {
-        self.0.store(value, Ordering::Relaxed);
+        self.delay.store(value, Ordering::Relaxed);
     }
 
-    pub fn get(&self) -> u32{
-        self.0.load(Ordering::Relaxed)
+    pub fn get(&self) -> u32 {
+        self.delay.load(Ordering::Relaxed)
     }
 }

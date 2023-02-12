@@ -1,14 +1,15 @@
 mod interfaces;
 
-use std::sync::atomic::{AtomicU32, AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::RwLock;
 
-use crate::rocket::futures::StreamExt;
 use interfaces::{
-    CacheLogEvent, CacheTraderInfo, CurrentBuyRate, CurrentGood, CurrentSellRate, Time, TraderInfo, Delay, Block,
+    Block, CacheLogEvent, CacheTraderInfo, CurrentBuyRate, CurrentGood, CurrentSellRate, Delay,
+    Time, TraderInfo,
 };
 use rand::{rngs::OsRng, Rng};
 use reqwest_eventsource::{Event as ReqEvent, EventSource};
+use crate::rocket::futures::StreamExt;
 use rocket::fs::{relative, FileServer};
 use rocket::response::stream::{Event as RocketEvent, EventStream};
 use rocket::serde::json::Json;
@@ -107,8 +108,8 @@ fn get_trader_goods<'a>(
     rec: &'a State<Sender<TraderInfo>>,
     mut end: Shutdown,
     cache: &'a State<CacheTraderInfo>,
-    stop: &'a State<Block>
-) -> EventStream![RocketEvent + 'a]{
+    stop: &'a State<Block>,
+) -> EventStream![RocketEvent + 'a] {
     let mut rx = rec.subscribe();
     //Clone of the current situation in order to provide to the client all the states that have been previously recorded
     let mut cop = cache.iter();
@@ -253,7 +254,7 @@ async fn get_current_market<'a>(market: &'a str, mut end: Shutdown) -> EventStre
                         Some(content) => match content {
                             Ok(ReqEvent::Message(message)) => {
                                 MsgMultiplexed{channel: Channels::CurrentGoods, log: message.data}
-                            },
+                            }
                             _ => continue,
                         },
                         None => break,
@@ -334,7 +335,7 @@ fn get_log<'a>(
     queue: &State<Sender<LogEvent>>,
     mut end: Shutdown,
     cache: &State<CacheLogEvent>,
-    stop: &'a State<Block>
+    stop: &'a State<Block>,
 ) -> EventStream![RocketEvent + 'a] {
     //Subscribe to the queue for future Logs
     let mut rx = queue.subscribe();
@@ -379,13 +380,14 @@ fn unblock(stop: &State<Block>) {
     stop.0.store(false, Ordering::Relaxed)
 }
 
-#[post("/delay", data="<data>")]
-fn set_delay(data: Json<u32>, state_delay: &State<Delay>) {
-    state_delay.set(data.0)
+#[post("/delay", data = "<data>")]
+fn set_delay(data: Json<String>, state_delay: &State<Delay>) {
+    let content = data.0.parse::<u32>().unwrap();
+    state_delay.set(content);
 }
 
 #[get("/delay")]
-fn get_delay(state_delay: &State<Delay>) -> Json<u32>{
+fn get_delay(state_delay: &State<Delay>) -> Json<u32> {
     Json(state_delay.get())
 }
 
@@ -398,7 +400,9 @@ fn rocket() -> _ {
         .manage(channel::<TraderInfo>(16536).0)
         .manage(CacheTraderInfo(RwLock::new(Vec::new())))
         .manage(Block(AtomicBool::new(false)))
-        .manage(Delay(AtomicU32::new(1000)))
+        .manage(Delay {
+            delay: AtomicU32::new(1000),
+        })
         .manage([
             channel::<CurrentGood>(16536).0,
             channel::<CurrentGood>(16536).0,

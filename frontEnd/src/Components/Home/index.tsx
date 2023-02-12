@@ -27,6 +27,25 @@ const Home = () => {
       .catch((err) => console.log("Error during blocking:", err));
   };
 
+  const [value, setValue] = useState<number>(1000);
+
+  const handleChange = ({ target }: { target: any }) => {
+    const { value } = target;
+    setValue(value);
+  };
+
+  const handleOver = () => {
+    fetch("/delay", {
+      method: "POST",
+      headers: {
+        'Content-type': 'application/json'
+      },
+      body: JSON.stringify(value),
+    })
+      .then(() => console.log("Delay successfully updated"))
+      .catch((err) => console.log("Error during saving of delay:", err));
+  };
+
   return (
     <div style={{ display: "flex", gap: 12 }}>
       <div
@@ -48,6 +67,16 @@ const Home = () => {
         }}
       >
         <TraderInfo />
+        Delay: {value}ms
+        <input
+          type="range"
+          min="10"
+          value={value}
+          max="10000"
+          className="slider"
+          onChange={handleChange}
+          onMouseUp={handleOver}
+        />
         <div style={{ display: "flex", gap: 12 }}>
           <a href="/marketController">
             <button className="button">Go to Markets!</button>
