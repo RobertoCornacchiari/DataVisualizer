@@ -110,7 +110,7 @@ pub struct Time(pub AtomicU32);
 
 impl Time {
     fn increment(&self, quantity: u32) -> u32 {
-        self.0.fetch_add(quantity, Ordering::Relaxed) + 1
+        self.0.fetch_add(quantity, Ordering::Relaxed) + quantity
     }
 
     pub fn increment_one(&self) -> u32 {

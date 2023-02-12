@@ -11,13 +11,13 @@ const App = () => {
         path="/marketController"
         element={
           <>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 10 }}>
               <MarketVisualizer market="BFB" />
               <MarketVisualizer market="RCNZ" />
               <MarketVisualizer market="ZSE" />
             </div>
             <a href="/">
-              <button>Go to Events!</button>
+              <button className="button">Go to Events!</button>
             </a>
           </>
         }

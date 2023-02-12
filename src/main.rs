@@ -1,6 +1,6 @@
 mod interfaces;
 
-use std::sync::atomic::AtomicU32;
+use std::sync::atomic::{AtomicU32, AtomicBool, Ordering};
 use std::sync::RwLock;
 
 use crate::rocket::futures::StreamExt;
@@ -103,17 +103,24 @@ fn post_trader_goods(
 
 //Function used to send to the client the current goods held by the market referenced
 #[get("/currentTraderGoods")]
-fn get_trader_goods(
-    rec: &State<Sender<TraderInfo>>,
+fn get_trader_goods<'a>(
+    rec: &'a State<Sender<TraderInfo>>,
     mut end: Shutdown,
-    cache: &State<CacheTraderInfo>,
-) -> EventStream![] {
+    cache: &'a State<CacheTraderInfo>,
+    stop: &'a State<Block>
+) -> EventStream![RocketEvent + 'a]{
     let mut rx = rec.subscribe();
     //Clone of the current situation in order to provide to the client all the states that have been previously recorded
     let mut cop = cache.iter();
     EventStream! {
         loop {
-            //If there are some old states to send
+            if stop.0.load(Ordering::Relaxed) {
+                //To shutdown gracefully (if not needed, just continue)
+                select! {
+                    _ = &mut end => break,
+                    _ = async{true} => continue,
+                }
+            }
             let msg = match cop.next() {
                 Some(event) => event,
                 None => {
@@ -221,7 +228,7 @@ fn get_current_sell_rate(
 }
 
 #[get("/currentMarket/<market>")]
-async fn get_current_market(market: &str, mut end: Shutdown) -> EventStream![] {
+async fn get_current_market<'a>(market: &'a str, mut end: Shutdown) -> EventStream![] {
     let index = match market {
         "BFB" => 0,
         "RCNZ" => 1,
@@ -327,13 +334,21 @@ fn get_log<'a>(
     queue: &State<Sender<LogEvent>>,
     mut end: Shutdown,
     cache: &State<CacheLogEvent>,
-) -> EventStream![] {
+    stop: &'a State<Block>
+) -> EventStream![RocketEvent + 'a] {
     //Subscribe to the queue for future Logs
     let mut rx = queue.subscribe();
     //Clone of the current situation in order to provide to the client all the Logs that have been previously recorded
     let mut cop = cache.iter();
     EventStream! {
         loop {
+            if stop.0.load(Ordering::Relaxed) {
+                //To shutdown gracefully (if not needed, just continue)
+                select! {
+                    _ = &mut end => break,
+                    _ = async{true} => continue,
+                }
+            }
             //If there are some old Logs to send
             let msg = match cop.next() {
                 Some(event) => event,
@@ -354,6 +369,19 @@ fn get_log<'a>(
     }
 }
 
+#[post("/block")]
+fn block(stop: &State<Block>) {
+    stop.0.store(true, Ordering::Relaxed)
+}
+
+#[post("/unblock")]
+fn unblock(stop: &State<Block>) {
+    stop.0.store(false, Ordering::Relaxed)
+}
+
+//Struct used to block the stream of data sent to the client
+pub struct Block(pub AtomicBool);
+
 #[launch]
 fn rocket() -> _ {
     rocket::build()
@@ -362,6 +390,7 @@ fn rocket() -> _ {
         .manage(CacheLogEvent(RwLock::new(Vec::new())))
         .manage(channel::<TraderInfo>(16536).0)
         .manage(CacheTraderInfo(RwLock::new(Vec::new())))
+        .manage(Block(AtomicBool::new(false)))
         .manage([
             channel::<CurrentGood>(16536).0,
             channel::<CurrentGood>(16536).0,
@@ -390,7 +419,9 @@ fn rocket() -> _ {
                 fake_good_labels,
                 post_trader_goods,
                 get_trader_goods,
-                get_default_exchange
+                get_default_exchange,
+                block,
+                unblock
             ],
         )
         .mount(

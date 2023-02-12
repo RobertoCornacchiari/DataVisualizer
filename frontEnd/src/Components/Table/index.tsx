@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTable, usePagination } from "react-table";
 import { IColumn, ILogEvent } from "../../interfaces";
 import "./index.css";
@@ -42,23 +42,43 @@ const columns: IColumn[] = [
 const Table = () => {
   const [data, setData] = useState<ILogEvent[]>([]);
   const [stop, setStop] = useState<boolean>(false);
-  const [dataToDisplay, setDataToDisplay] = useState<ILogEvent[]>([]);
+  const [dataBuffer, setDataBuffer] = useState<ILogEvent[]>([]);
+
+  //Function that redirects the messages to the correct state, based on the stop status
+  const receiveData = useRef((msg: ILogEvent) => {
+    if (!stop) {
+      setData((prev) => [msg, ...prev]);
+    } else {
+      setDataBuffer((prev) => [msg, ...prev]);
+    }
+  });
 
   useEffect(() => {
     let connection = new EventSource("/log");
     connection.addEventListener("message", (ev) => {
       const msg = JSON.parse(ev.data);
       console.log(msg);
-      setData((prev) => [msg, ...prev]);
+      receiveData.current(msg);
     });
     return () => {
       connection.close();
     };
   }, []);
 
+  //Mechanism used for client-side pause and resume
   useEffect(() => {
-    if (!stop) setDataToDisplay(data);
-  }, [stop, data]);
+    //Update the function that sends the incoming messages to the corret state
+    receiveData.current = (msg: ILogEvent) => {
+      if (!stop) {
+        setData((prev) => [msg, ...prev]);
+      } else {
+        setDataBuffer((prev) => [msg, ...prev]);
+      }
+    };
+
+    //Resume the unseen messages
+    if (!stop) setData((prev) => [...dataBuffer, ...prev]);
+  }, [stop]);
 
   // Use the state and functions returned from useTable to build the UI
   const {
@@ -79,7 +99,7 @@ const Table = () => {
   } = useTable(
     {
       columns,
-      data: dataToDisplay,
+      data,
       initialState: { pageIndex: 0, pageSize: 10 },
     },
     usePagination
@@ -169,12 +189,6 @@ const Table = () => {
           disabled={data.length === 0}
         >
           DEL
-        </button>
-        <button
-          className="button"
-          onClick={() => setStop((prev) => !prev)}
-        >
-          {stop ? "RESUME" : "PAUSE"}
         </button>
       </div>
     </>
