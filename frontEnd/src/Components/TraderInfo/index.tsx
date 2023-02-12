@@ -22,7 +22,7 @@ const TraderInfo = () => {
       msg.time = "" + msg.time;
       console.log("Current trader goods:", msg);
       setData((prev) => [...prev, msg]);
-      setLastData(new Map(lastData.set(msg.kind, msg.quantity)));
+      setLastData(l => new Map(l.set(msg.kind, msg.quantity)));
       if (msg.kind === "TOT")
         walletValue.current = msg.quantity;
     });

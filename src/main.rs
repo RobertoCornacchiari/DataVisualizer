@@ -5,7 +5,7 @@ use std::sync::RwLock;
 
 use crate::rocket::futures::StreamExt;
 use interfaces::{
-    CacheLogEvent, CacheTraderInfo, CurrentBuyRate, CurrentGood, CurrentSellRate, Time, TraderInfo,
+    CacheLogEvent, CacheTraderInfo, CurrentBuyRate, CurrentGood, CurrentSellRate, Time, TraderInfo, Delay, Block,
 };
 use rand::{rngs::OsRng, Rng};
 use reqwest_eventsource::{Event as ReqEvent, EventSource};
@@ -379,8 +379,15 @@ fn unblock(stop: &State<Block>) {
     stop.0.store(false, Ordering::Relaxed)
 }
 
-//Struct used to block the stream of data sent to the client
-pub struct Block(pub AtomicBool);
+#[post("/delay", data="<data>")]
+fn set_delay(data: Json<u32>, state_delay: &State<Delay>) {
+    state_delay.set(data.0)
+}
+
+#[get("/delay")]
+fn get_delay(state_delay: &State<Delay>) -> Json<u32>{
+    Json(state_delay.get())
+}
 
 #[launch]
 fn rocket() -> _ {
@@ -391,6 +398,7 @@ fn rocket() -> _ {
         .manage(channel::<TraderInfo>(16536).0)
         .manage(CacheTraderInfo(RwLock::new(Vec::new())))
         .manage(Block(AtomicBool::new(false)))
+        .manage(Delay(AtomicU32::new(1000)))
         .manage([
             channel::<CurrentGood>(16536).0,
             channel::<CurrentGood>(16536).0,
@@ -421,7 +429,9 @@ fn rocket() -> _ {
                 get_trader_goods,
                 get_default_exchange,
                 block,
-                unblock
+                unblock,
+                get_delay,
+                set_delay
             ],
         )
         .mount(

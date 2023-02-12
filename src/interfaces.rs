@@ -1,5 +1,5 @@
 use std::{sync::{
-    atomic::{AtomicU32, Ordering},
+    atomic::{AtomicU32, Ordering, AtomicBool},
     RwLock,
 }, fmt::{Display, Formatter}};
 
@@ -197,5 +197,21 @@ impl Iterator for IterCacheTraderInfo {
         } else {
             None
         }
+    }
+}
+
+//Struct used to block the stream of data sent to the client
+pub struct Block(pub AtomicBool);
+
+#[derive(Serialize, Deserialize)]
+pub struct Delay (pub AtomicU32);
+
+impl Delay {
+    pub fn set(&self, value: u32) {
+        self.0.store(value, Ordering::Relaxed);
+    }
+
+    pub fn get(&self) -> u32{
+        self.0.load(Ordering::Relaxed)
     }
 }
