@@ -1,7 +1,7 @@
 use std::{
     fmt::{Display, Formatter},
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
+        atomic::{AtomicBool, AtomicU32, Ordering, AtomicU8},
         RwLock,
     },
 };
@@ -239,5 +239,21 @@ impl Delay {
 
     pub fn get(&self) -> u32 {
         self.delay.load(Ordering::Relaxed)
+    }
+}
+
+pub struct Trader(pub AtomicU8);
+
+impl Trader {
+    pub fn get(&self) -> u8 {
+        self.0.load(Ordering::Acquire)
+    }
+
+    pub fn set(&self, value: u8) {
+        self.0.store(value, Ordering::Relaxed)
+    }
+
+    pub fn stop(&self) {
+        self.0.store(127, Ordering::Relaxed);
     }
 }

@@ -1,15 +1,15 @@
 mod interfaces;
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 use std::sync::RwLock;
 
+use crate::rocket::futures::StreamExt;
 use interfaces::{
     Block, CacheLogEvent, CacheTraderInfo, CurrentBuyRate, CurrentGood, CurrentSellRate, Delay,
     Time, TraderInfo,
 };
 use rand::{rngs::OsRng, Rng};
 use reqwest_eventsource::{Event as ReqEvent, EventSource};
-use crate::rocket::futures::StreamExt;
 use rocket::fs::{relative, FileServer};
 use rocket::response::stream::{Event as RocketEvent, EventStream};
 use rocket::serde::json::Json;
@@ -24,7 +24,7 @@ use unitn_market_2022::good::consts::{
 use unitn_market_2022::good::good_kind::GoodKind;
 use unitn_market_2022::market::good_label::GoodLabel;
 
-use crate::interfaces::{Channels, LogEvent, MsgMultiplexed};
+use crate::interfaces::{Channels, LogEvent, MsgMultiplexed, Trader};
 
 #[macro_use]
 extern crate rocket;
@@ -391,6 +391,51 @@ fn get_delay(state_delay: &State<Delay>) -> Json<u32> {
     Json(state_delay.get())
 }
 
+#[get("/traderToUse")]
+async fn get_trader<'a>(
+    trader: &'a State<Trader>,
+    mut end: Shutdown,
+) -> EventStream![RocketEvent + 'a] {
+    EventStream! {
+        loop {
+            let msg = select! {
+                msg = async{
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    trader.get()
+                } => match msg {
+                    0 => {
+                        println!("Match con: {msg}");
+                            trader.stop();
+                            msg
+                        },
+                    1 => {
+                        println!("Match con: {msg}");
+                        trader.stop();
+                        msg
+                    },
+                    2 => {
+                        println!("Match con: {msg}");
+                        trader.stop();
+                        msg
+                    },
+                    127 => break,
+                    _ => continue
+                },
+                _ = &mut end => break,
+            };
+
+            yield RocketEvent::json(&msg);
+        }
+
+    }
+}
+
+#[post("/traderToUse", data = "<trader>")]
+fn post_trader(trader: Json<String>, state_trader: &State<Trader>) {
+    let value = trader.0.parse::<u8>().unwrap();
+    state_trader.set(value);
+}
+
 #[launch]
 fn rocket() -> _ {
     rocket::build()
@@ -400,6 +445,7 @@ fn rocket() -> _ {
         .manage(channel::<TraderInfo>(16536).0)
         .manage(CacheTraderInfo(RwLock::new(Vec::new())))
         .manage(Block(AtomicBool::new(false)))
+        .manage(Trader(AtomicU8::new(10)))
         .manage(Delay {
             delay: AtomicU32::new(1000),
         })
@@ -435,7 +481,9 @@ fn rocket() -> _ {
                 block,
                 unblock,
                 get_delay,
-                set_delay
+                set_delay,
+                get_trader,
+                post_trader
             ],
         )
         .mount(
