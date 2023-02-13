@@ -33,7 +33,20 @@ use tokio::runtime::Runtime;
 let rt  = Runtime::new().unwrap();
 rt.block_on(<async function>);
 ```
-This will force the execution to wait for the APIs to return before continuing the procedure
+This will force the execution to wait for the APIs to return before continuing the procedure.
+
+## GET Delay
+This API returns the number of milliseconds to wait before performing the next event. This can be usefull in order to inspect what's happening to the trader without being overwhelmed by requests.
+
+The endopint of this API is
+```
+GET /delay
+```
+### Usage Example
+```
+let res = client.get("http://localhost:8000/delay").send().await.unwrap();
+let value:u32 = res.json::<u32>().await.unwrap();
+```
 
 ## POST LogEvent
 This API is used to post every action performed by the trader, in order to display them inside the table. The actions that can be sent to this API are the ones defined in the __EventKind__ enum.
