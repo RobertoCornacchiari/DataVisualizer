@@ -45,7 +45,7 @@ GET /delay
 ### Usage Example
 ```
 let res = client.get("http://localhost:8000/delay").send().await.unwrap();
-let value:u32 = res.json::<u32>().await.unwrap();
+let value:u64 = res.json::<u64>().await.unwrap();
 ```
 
 ## POST LogEvent

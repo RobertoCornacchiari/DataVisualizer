@@ -1,7 +1,7 @@
 use std::{
     fmt::{Display, Formatter},
     sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering, AtomicU8},
+        atomic::{AtomicBool, AtomicU32, Ordering, AtomicU8, AtomicU64},
         RwLock,
     },
 };
@@ -229,15 +229,15 @@ pub struct Block(pub AtomicBool);
 
 #[derive(Serialize, Deserialize)]
 pub struct Delay {
-    pub delay: AtomicU32,
+    pub delay: AtomicU64,
 }
 
 impl Delay {
-    pub fn set(&self, value: u32) {
+    pub fn set(&self, value: u64) {
         self.delay.store(value, Ordering::Relaxed);
     }
 
-    pub fn get(&self) -> u32 {
+    pub fn get(&self) -> u64 {
         self.delay.load(Ordering::Relaxed)
     }
 }

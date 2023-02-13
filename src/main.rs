@@ -1,6 +1,6 @@
 mod interfaces;
 
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering, AtomicU64};
 use std::sync::RwLock;
 
 use crate::rocket::futures::StreamExt;
@@ -382,12 +382,12 @@ fn unblock(stop: &State<Block>) {
 
 #[post("/delay", data = "<data>")]
 fn set_delay(data: Json<String>, state_delay: &State<Delay>) {
-    let content = data.0.parse::<u32>().unwrap();
+    let content = data.0.parse::<u64>().unwrap();
     state_delay.set(content);
 }
 
 #[get("/delay")]
-fn get_delay(state_delay: &State<Delay>) -> Json<u32> {
+fn get_delay(state_delay: &State<Delay>) -> Json<u64> {
     Json(state_delay.get())
 }
 
@@ -447,7 +447,7 @@ fn rocket() -> _ {
         .manage(Block(AtomicBool::new(false)))
         .manage(Trader(AtomicU8::new(10)))
         .manage(Delay {
-            delay: AtomicU32::new(1000),
+            delay: AtomicU64::new(1000),
         })
         .manage([
             channel::<CurrentGood>(16536).0,
