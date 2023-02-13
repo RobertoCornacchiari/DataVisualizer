@@ -445,7 +445,16 @@ fn rocket() -> _ {
         .manage(channel::<TraderInfo>(16536).0)
         .manage(CacheTraderInfo(RwLock::new(Vec::new())))
         .manage(Block(AtomicBool::new(false)))
-        .manage(Trader(AtomicU8::new(10)))
+        /*
+        
+            CHANGE THIS TO START FROM 10!!
+            !
+            !
+            !
+                                    |
+                                    v
+         */
+        .manage(Trader(AtomicU8::new(0)))
         .manage(Delay {
             delay: AtomicU64::new(1000),
         })
