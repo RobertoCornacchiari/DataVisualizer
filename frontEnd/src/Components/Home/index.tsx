@@ -24,16 +24,16 @@ const Home = () => {
         console.log("Successful unblock");
         setStop(false);
       })
-      .catch((err) => console.log("Error during blocking:", err));
+      .catch((err) => console.log("Error during unblocking:", err));
   };
 
-const handle_click=(stop: boolean) => {
-  if (stop) {
-    handle_unblock();
-  } else {
-    handle_block();
-  }
-}
+  const handle_click = (stop: boolean) => {
+    if (stop) {
+      handle_unblock();
+    } else {
+      handle_block();
+    }
+  };
 
   const [value, setValue] = useState<number>(1000);
 
@@ -46,7 +46,7 @@ const handle_click=(stop: boolean) => {
     fetch("/delay", {
       method: "POST",
       headers: {
-        'Content-type': 'application/json'
+        "Content-type": "application/json",
       },
       body: JSON.stringify(value),
     })
@@ -92,10 +92,7 @@ const handle_click=(stop: boolean) => {
           <a href="/goodsController">
             <button className="button">Goods!</button>
           </a>
-          <button
-            className="button"
-            onClick={() => handle_click(stop)}
-          >
+          <button className="button" onClick={() => handle_click(stop)}>
             {stop ? "RESUME" : "PAUSE"}
           </button>
         </div>

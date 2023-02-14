@@ -102,7 +102,7 @@ fn post_current_good_labels(
             value: good_label.exchange_rate_sell,
             data: market.to_string() + " SELL",
         };
-        
+
         let good_index = good_index(good_label.good_kind.to_string().as_str());
         let _res = good_state[good_index].send(good_state_buy);
         let _res = good_state[good_index].send(good_state_sell);
@@ -117,7 +117,7 @@ fn get_good_info(
 ) -> EventStream![] {
     let index = good_index(good);
     //If the index is 4 it means that a non valid good was passed
-    let mut rx = good_state[index%4].subscribe();
+    let mut rx = good_state[index % 4].subscribe();
 
     EventStream! {
         loop{
@@ -183,7 +183,7 @@ fn get_trader_goods<'a>(
                 //To shutdown gracefully (if not needed, just continue)
                 select! {
                     _ = &mut end => break,
-                    _ = async{true} => continue,
+                    _ = async{tokio::time::sleep(std::time::Duration::from_millis(100)).await;true} => continue,
                 }
             }
             let msg = match cop.next() {
@@ -391,7 +391,10 @@ fn get_log<'a>(
                 //To shutdown gracefully (if not needed, just continue)
                 select! {
                     _ = &mut end => break,
-                    _ = async{true} => continue,
+                    _ = async{
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        true
+                    } => continue,
                 }
             }
             //If there are some old Logs to send
