@@ -21,11 +21,19 @@ const Home = () => {
       method: "POST",
     })
       .then(() => {
-        console.log("Successful block");
+        console.log("Successful unblock");
         setStop(false);
       })
       .catch((err) => console.log("Error during blocking:", err));
   };
+
+const handle_click=(stop: boolean) => {
+  if (stop) {
+    handle_unblock();
+  } else {
+    handle_block();
+  }
+}
 
   const [value, setValue] = useState<number>(1000);
 
@@ -86,7 +94,7 @@ const Home = () => {
           </a>
           <button
             className="button"
-            onClick={stop ? handle_unblock : handle_block}
+            onClick={() => handle_click(stop)}
           >
             {stop ? "RESUME" : "PAUSE"}
           </button>
