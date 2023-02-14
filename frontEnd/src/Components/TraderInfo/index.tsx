@@ -20,9 +20,9 @@ const TraderInfo = () => {
 
   const filter = (data: ITraderGood[], size: number): ITraderGood[] => {
     if (size === 0) return data;
-    //The 4 is there because there are 4 goodkinds
+    //The 5 is there because there are 4 goodkinds + total
     else {
-      let a = data.slice(-Math.min(4 * size, data.length));
+      let a = data.slice(-Math.min(5 * size, data.length));
       console.log("Slice:", a);
       return a;
     }
