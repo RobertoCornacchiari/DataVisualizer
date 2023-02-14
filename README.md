@@ -177,7 +177,7 @@ where market is one of the market used in the simulationo (`"BFB", "RCNZ", "ZSE"
 
 The body to pass is a `Vec<GoodLabel>`, easily obtainable calling the method _get\_goods()_ of the Market trait.
 
-This API should be called at the beginning and after each __Event__ performed __WITH SUCCESS__ by the trader (every time a day passes).
+This API should be called at the beginning of the simulation and after each __Event__ performed __WITH SUCCESS__ by the trader (every time a day passes).
 
 ### Usage Example[^1]
 ```
@@ -186,7 +186,7 @@ let labels: Vec<GoodLabel> = market.borrow().get_goods();
 let _res = client.post("http://localhost:8000/currentGoodLabels/".to_string() + market_name).json(&labels).send().await;
 ```
 
-## POST market status
+## POST trader status
 This API is used to send the current status of the trader (quantity of each good).
 The endpoint of this API is
 ```
