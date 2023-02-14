@@ -16,6 +16,18 @@ const TraderInfo = () => {
     new Map()
   );
 
+  const [size, setSize] = useState<number>(0);
+
+  const filter = (data: ITraderGood[], size: number): ITraderGood[] => {
+    if (size === 0) return data;
+    //The 4 is there because there are 4 goodkinds
+    else {
+      let a = data.slice(-Math.min(4 * size, data.length));
+      console.log("Slice:", a);
+      return a;
+    }
+  };
+
   useEffect(() => {
     let connection = new EventSource("/currentTraderGoods");
 
@@ -24,9 +36,8 @@ const TraderInfo = () => {
       msg.time = "" + msg.time;
       console.log("Current trader goods:", msg);
       setData((prev) => [...prev, msg]);
-      setLastData(l => new Map(l.set(msg.kind, msg.quantity)));
-      if (msg.kind === "TOT")
-        walletValue.current = msg.quantity;
+      setLastData((l) => new Map(l.set(msg.kind, msg.quantity)));
+      if (msg.kind === "TOT") walletValue.current = msg.quantity;
     });
 
     return () => {
@@ -61,7 +72,27 @@ const TraderInfo = () => {
 
   return (
     <>
-      <Graph data={data} xField="time" yField="quantity" seriesField="kind" colors={COLORS} width={500}/>
+      <Graph
+        data={filter(data, size)}
+        xField="time"
+        yField="quantity"
+        seriesField="kind"
+        colors={COLORS}
+        width={500}
+      />
+      <select
+        value={size}
+        onChange={(e) => {
+          setSize(Number(e.target.value));
+        }}
+        className="select"
+      >
+        {["All", 10, 25, 50, 100].map((pageSize) => (
+          <option key={pageSize} value={pageSize}>
+            Show {pageSize}
+          </option>
+        ))}
+      </select>
       <br />
       <b>Wallet value:</b> {walletValue.current.toFixed(4)} EUR
       <Pie data={dataPie} />
