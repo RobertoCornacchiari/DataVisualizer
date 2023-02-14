@@ -25,3 +25,12 @@ body {
   align-items: center;
   padding: 12px;
 }
+
+.goodGrid {
+  grid-template-columns: auto auto;
+  grid-row: auto auto;
+  grid-column-gap: 30px;
+  grid-row-gap: 30px;
+  display: grid;
+  margin-bottom: 30px;
+}

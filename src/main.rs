@@ -1,12 +1,12 @@
 mod interfaces;
 
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering, AtomicU64};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::RwLock;
 
 use crate::rocket::futures::StreamExt;
 use interfaces::{
     Block, CacheLogEvent, CacheTraderInfo, CurrentBuyRate, CurrentGood, CurrentSellRate, Delay,
-    Time, TraderInfo,
+    GoodMarketInfo, Time, TraderInfo,
 };
 use rand::{rngs::OsRng, Rng};
 use reqwest_eventsource::{Event as ReqEvent, EventSource};
@@ -29,6 +29,25 @@ use crate::interfaces::{Channels, LogEvent, MsgMultiplexed, Trader};
 #[macro_use]
 extern crate rocket;
 
+fn market_index(market: &str) -> usize {
+    match market {
+        "BFB" => 0,
+        "RCNZ" => 1,
+        "ZSE" => 2,
+        _ => 3,
+    }
+}
+
+fn good_index(good: &str) -> usize {
+    match good {
+        "EUR" => 0,
+        "USD" => 1,
+        "YEN" => 2,
+        "YUAN" => 3,
+        _ => 4,
+    }
+}
+
 //Function used to receive from the trader the current GoodLabels held by the market referenced
 #[post("/currentGoodLabels/<market>", data = "<goods>")]
 fn post_current_good_labels(
@@ -37,14 +56,13 @@ fn post_current_good_labels(
     current_goods: &State<[Sender<CurrentGood>; 3]>,
     current_buy_rate: &State<[Sender<CurrentBuyRate>; 3]>,
     current_sell_rate: &State<[Sender<CurrentSellRate>; 3]>,
+    good_state: &State<[Sender<GoodMarketInfo>; 4]>,
     time: &State<Time>,
 ) {
-    let index = match market {
-        "BFB" => 0,
-        "RCNZ" => 1,
-        "ZSE" => 2,
-        _ => return,
-    };
+    let index = market_index(market);
+    if index == 3 {
+        return;
+    }
     //I add all the goodLabels to the channels
     goods.sort_by(|a, b| a.good_kind.to_string().cmp(&b.good_kind.to_string()));
     goods.iter().for_each(|good_label| {
@@ -71,7 +89,53 @@ fn post_current_good_labels(
             time,
         };
         let _res = current_sell_rate[index].send(c_sell_rate);
+
+        //Send data for the Goods graphs
+        let good_state_buy = GoodMarketInfo {
+            time,
+            value: good_label.exchange_rate_buy,
+            data: market.to_string() + " BUY",
+        };
+
+        let good_state_sell = GoodMarketInfo {
+            time,
+            value: good_label.exchange_rate_sell,
+            data: market.to_string() + " SELL",
+        };
+        
+        let good_index = good_index(good_label.good_kind.to_string().as_str());
+        let _res = good_state[good_index].send(good_state_buy);
+        let _res = good_state[good_index].send(good_state_sell);
     });
+}
+
+#[get("/goodInfo/<good>")]
+fn get_good_info(
+    good: &str,
+    good_state: &State<[Sender<GoodMarketInfo>; 4]>,
+    mut end: Shutdown,
+) -> EventStream![] {
+    let index = good_index(good);
+    //If the index is 4 it means that a non valid good was passed
+    let mut rx = good_state[index%4].subscribe();
+
+    EventStream! {
+        loop{
+            if index == 4 {
+                break;
+            }
+            let msg =
+                select! {
+                msg = rx.recv() => match msg {
+                    Ok(msg) => msg,
+                    Err(RecvError::Closed) => break,
+                    Err(RecvError::Lagged(_)) => continue,
+                },
+                _ = &mut end => break,
+            };
+            yield RocketEvent::json(&msg);
+        }
+    }
 }
 
 //Function used to receive the goods owned by the trader
@@ -184,12 +248,7 @@ fn get_current_goods(
     rec: &State<[Sender<CurrentGood>; 3]>,
     end: Shutdown,
 ) -> EventStream![] {
-    let index = match market {
-        "BFB" => 0,
-        "RCNZ" => 1,
-        "ZSE" => 2,
-        _ => 3,
-    };
+    let index = market_index(market);
     //If the index is 3 the market sent is not valid
     send_event_stream(rec[index % 3].subscribe(), index, end)
 }
@@ -201,12 +260,7 @@ fn get_current_buy_rate(
     rec: &State<[Sender<CurrentBuyRate>; 3]>,
     end: Shutdown,
 ) -> EventStream![] {
-    let index = match market {
-        "BFB" => 0,
-        "RCNZ" => 1,
-        "ZSE" => 2,
-        _ => 3,
-    };
+    let index = market_index(market);
     //If the index is 3 the market sent is not valid
     send_event_stream(rec[index % 3].subscribe(), index, end)
 }
@@ -218,24 +272,14 @@ fn get_current_sell_rate(
     rec: &State<[Sender<CurrentSellRate>; 3]>,
     end: Shutdown,
 ) -> EventStream![] {
-    let index = match market {
-        "BFB" => 0,
-        "RCNZ" => 1,
-        "ZSE" => 2,
-        _ => 3,
-    };
+    let index = market_index(market);
     //If the index is 3 the market sent is not valid
     send_event_stream(rec[index % 3].subscribe(), index, end)
 }
 
 #[get("/currentMarket/<market>")]
 async fn get_current_market<'a>(market: &'a str, mut end: Shutdown) -> EventStream![] {
-    let index = match market {
-        "BFB" => 0,
-        "RCNZ" => 1,
-        "ZSE" => 2,
-        _ => 3,
-    };
+    let index = market_index(market);
     let mut source_goods =
         EventSource::get("http://localhost:8000/currentGoods/".to_string() + market);
     let mut source_buy_rate =
@@ -461,6 +505,12 @@ fn rocket() -> _ {
             channel::<CurrentSellRate>(16536).0,
             channel::<CurrentSellRate>(16536).0,
         ])
+        .manage([
+            channel::<GoodMarketInfo>(16536).0,
+            channel::<GoodMarketInfo>(16536).0,
+            channel::<GoodMarketInfo>(16536).0,
+            channel::<GoodMarketInfo>(16536).0,
+        ])
         .mount(
             "/",
             routes![
@@ -480,13 +530,19 @@ fn rocket() -> _ {
                 get_delay,
                 set_delay,
                 get_trader,
-                post_trader
+                post_trader,
+                get_good_info
             ],
         )
         .mount(
-            "/marketController",
+            "/goodsController",
             FileServer::from(relative!("frontEnd/build")).rank(2),
-        ).mount(
+        )
+        .mount(
+            "/marketsController",
+            FileServer::from(relative!("frontEnd/build")).rank(2),
+        )
+        .mount(
             "/home",
             FileServer::from(relative!("frontEnd/build")).rank(2),
         )

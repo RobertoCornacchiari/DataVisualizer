@@ -7,6 +7,8 @@ interface IProps {
   market: string;
 }
 
+const COLORS = ["#1979C9", "#D62A0D", "#FAA219", "#00cb00", "#f700ff"];
+
 const MarketVisualizer = ({ market }: IProps) => {
   const [dataCurrentGoods, setDataCurrentGoods] = useState<ILogMarket[]>([]);
   const [dataCurrentBuyRate, setDataCurrentBuyRate] = useState<ILogMarket[]>(
@@ -112,6 +114,8 @@ const MarketVisualizer = ({ market }: IProps) => {
             xField="time"
             yField="value"
             seriesField="kind"
+            colors={COLORS}
+            width={500}
           />
         </div>
         <div>
@@ -121,6 +125,8 @@ const MarketVisualizer = ({ market }: IProps) => {
             xField="time"
             yField="value"
             seriesField="kind"
+            colors={COLORS}
+            width={500}
           />
         </div>
         <div>
@@ -130,6 +136,8 @@ const MarketVisualizer = ({ market }: IProps) => {
             xField="time"
             yField="value"
             seriesField="kind"
+            colors={COLORS}
+            width={500}
           />
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { Routes } from "react-router-dom";
 import { Route } from "react-router-dom";
+import GoodVisualizer from "./Components/GoodVisualizer";
 import Home from "./Components/Home";
 import MarketVisualizer from "./Components/MarketVisualizer";
 import TraderPicker from "./Components/TraderPicker";
@@ -9,7 +10,23 @@ const App = () => {
   return (
     <Routes>
       <Route
-        path="/marketController"
+        path="/goodsController"
+        element={
+          <>
+            <div className="goodGrid">
+              <GoodVisualizer good="EUR" />
+              <GoodVisualizer good="USD" />
+              <GoodVisualizer good="YEN" />
+              <GoodVisualizer good="YUAN" />
+            </div>
+            <a href="/home">
+              <button className="button">Events!</button>
+            </a>
+          </>
+        }
+      />
+      <Route
+        path="/marketsController"
         element={
           <>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 10 }}>
@@ -18,7 +35,7 @@ const App = () => {
               <MarketVisualizer market="ZSE" />
             </div>
             <a href="/home">
-              <button className="button">Go to Events!</button>
+              <button className="button">Events!</button>
             </a>
           </>
         }

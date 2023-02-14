@@ -39,3 +39,9 @@ export interface ITraderGood {
   kind: string;
   quantity: number;
 }
+
+export interface IGoodInfo {
+  time: string;
+  data: string;
+  value: number;
+}

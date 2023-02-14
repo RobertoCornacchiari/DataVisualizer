@@ -3,6 +3,8 @@ import { ITraderGood } from "../../interfaces";
 import Graph from "../Graph";
 import Pie from "../Pie";
 
+const COLORS = ["#1979C9", "#D62A0D", "#FAA219", "#00cb00", "#f700ff"];
+
 const TraderInfo = () => {
   const [data, setData] = useState<ITraderGood[]>([]);
 
@@ -59,7 +61,7 @@ const TraderInfo = () => {
 
   return (
     <>
-      <Graph data={data} xField="time" yField="quantity" seriesField="kind" />
+      <Graph data={data} xField="time" yField="quantity" seriesField="kind" colors={COLORS} width={500}/>
       <br />
       <b>Wallet value:</b> {walletValue.current.toFixed(4)} EUR
       <Pie data={dataPie} />

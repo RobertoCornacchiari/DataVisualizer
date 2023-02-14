@@ -64,6 +64,13 @@ pub struct CurrentSellRate {
     pub kind: GoodKind,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct GoodMarketInfo {
+    pub time: u32,
+    pub data: String,
+    pub value: f32
+}
+
 #[derive(Serialize)]
 pub enum Channels {
     CurrentGoods,

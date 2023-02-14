@@ -78,8 +78,11 @@ const Home = () => {
           onMouseUp={handleOver}
         />
         <div style={{ display: "flex", gap: 12 }}>
-          <a href="/marketController">
-            <button className="button">Go to Markets!</button>
+          <a href="/marketsController">
+            <button className="button">Markets!</button>
+          </a>
+          <a href="/goodsController">
+            <button className="button">Goods!</button>
           </a>
           <button
             className="button"
