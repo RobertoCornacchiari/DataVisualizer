@@ -204,7 +204,7 @@ struct TraderGood{
 
 ```
 
-This API should be called at the beginning and after each __Event__ performed __WITH SUCCESS__ by the trader (every time a day passes).
+This API should be called at the beginning of the simulation and after each __Event__ performed __WITH SUCCESS__ by the trader (every time a day passes).
 
 ### Usage Example[^1]
 ```
