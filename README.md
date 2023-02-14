@@ -48,6 +48,56 @@ let res = client.get("http://localhost:8000/delay").send().await.unwrap();
 let value:u64 = res.json::<u64>().await.unwrap();
 ```
 
+## GET Trader
+This API returns (inside a stream) the trader that has been chosen from the visualizer.
+
+The endpoint of this API is
+```
+GET /traderToUse
+```
+### Usage Example
+```
+async fn initialize() -> u8 {
+    let mut connection = EventSource::get("http://localhost:8000/traderToUse");
+    let mut traderIndex: u8 = 4;
+
+    loop {
+        let next = connection.next().await;
+
+        match next {
+            Some(content) => match content {
+                Ok(ReqEvent::Message(message)) => {
+                    traderIndex = message.data.parse::<u8>().unwrap();
+                    break;
+                }
+                Err(err) => panic!("{err}"),
+                _ => continue
+            },
+            None => continue,
+        }
+    }
+    traderIndex
+}
+```
+This function waits for a message containing the trader index, returning it. A common usage of this may be the following: 
+inside the main function call __initialize__
+```
+let run_time = Runtime::new().unwrap();
+let res = run_time.block_on(async { initialize().await });
+
+match res {
+    0 => {
+        ...
+    },
+    ...
+}
+```
+The API returns:
+
+0. for __Sabin__'s trader;
+1. for __Alfredo__'s trader;
+2. for __Taras__'s trader;
+
 ## POST LogEvent
 This API is used to post every action performed by the trader, in order to display them inside the table. The actions that can be sent to this API are the ones defined in the __EventKind__ enum.
 

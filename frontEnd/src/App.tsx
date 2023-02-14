@@ -2,6 +2,7 @@ import { Routes } from "react-router-dom";
 import { Route } from "react-router-dom";
 import Home from "./Components/Home";
 import MarketVisualizer from "./Components/MarketVisualizer";
+import TraderPicker from "./Components/TraderPicker";
 import "./index.css";
 
 const App = () => {
@@ -16,18 +17,19 @@ const App = () => {
               <MarketVisualizer market="RCNZ" />
               <MarketVisualizer market="ZSE" />
             </div>
-            <a href="/">
+            <a href="/home">
               <button className="button">Go to Events!</button>
             </a>
           </>
         }
       />
       <Route
-        path="/"
+        path="/home"
         element={
           <Home />
         }
-      ></Route>
+      />
+      <Route path="/" element={<TraderPicker />}/>
     </Routes>
   );
 };

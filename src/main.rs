@@ -404,17 +404,14 @@ async fn get_trader<'a>(
                     trader.get()
                 } => match msg {
                     0 => {
-                        println!("Match con: {msg}");
                             trader.stop();
                             msg
                         },
                     1 => {
-                        println!("Match con: {msg}");
                         trader.stop();
                         msg
                     },
                     2 => {
-                        println!("Match con: {msg}");
                         trader.stop();
                         msg
                     },
@@ -431,8 +428,8 @@ async fn get_trader<'a>(
 }
 
 #[post("/traderToUse", data = "<trader>")]
-fn post_trader(trader: Json<String>, state_trader: &State<Trader>) {
-    let value = trader.0.parse::<u8>().unwrap();
+fn post_trader(trader: Json<u8>, state_trader: &State<Trader>) {
+    let value = trader.0;
     state_trader.set(value);
 }
 
@@ -445,16 +442,7 @@ fn rocket() -> _ {
         .manage(channel::<TraderInfo>(16536).0)
         .manage(CacheTraderInfo(RwLock::new(Vec::new())))
         .manage(Block(AtomicBool::new(false)))
-        /*
-        
-            CHANGE THIS TO START FROM 10!!
-            !
-            !
-            !
-                                    |
-                                    v
-         */
-        .manage(Trader(AtomicU8::new(0)))
+        .manage(Trader(AtomicU8::new(10)))
         .manage(Delay {
             delay: AtomicU64::new(1000),
         })
@@ -497,6 +485,9 @@ fn rocket() -> _ {
         )
         .mount(
             "/marketController",
+            FileServer::from(relative!("frontEnd/build")).rank(2),
+        ).mount(
+            "/home",
             FileServer::from(relative!("frontEnd/build")).rank(2),
         )
         .mount("/", FileServer::from(relative!("frontEnd/build")).rank(1))

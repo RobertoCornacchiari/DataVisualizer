@@ -1,0 +1,16 @@
+.traderContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    justify-content: center;
+    height: 90vh;
+}
+
+.traderButton {
+    font-size: larger;
+    color: white;
+    background-color: transparent;
+    border: 4px dashed white;
+    padding: 12px;
+    font-weight: 600;
+}
